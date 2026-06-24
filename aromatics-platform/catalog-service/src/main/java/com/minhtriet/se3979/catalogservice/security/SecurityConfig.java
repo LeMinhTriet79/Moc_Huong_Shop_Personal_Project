@@ -28,7 +28,7 @@ public class SecurityConfig {
                         // API trừ kho TẠM THỜI mở public để OrderService gọi sang (sau này sẽ dùng token nội bộ)
                         .requestMatchers(HttpMethod.POST, "/api/catalog/inventory/deduct").permitAll()
                         // Mở cửa cho Swagger UI
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/error").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
