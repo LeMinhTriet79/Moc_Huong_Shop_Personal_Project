@@ -7,7 +7,7 @@ spring:
   cloud:
     gateway:
       routes:
-        # 1. Định tuyến cho chức năng thực tế
+        # 1. Định tuyến cho chức năng thực tế (TUYỆT ĐỐI KHÔNG DÙNG RewritePath ở đây)
         - id: identity-service
           uri: lb://identity-service
           predicates:
@@ -50,7 +50,7 @@ eureka:
     service-url:
       defaultZone: http://localhost:8761/eureka/
 
-# Gom 3 cái Swagger lại làm 1 thanh xổ xuống
+# 3. Gom 3 cái Swagger lại làm 1 thanh xổ xuống
 springdoc:
   swagger-ui:
     urls:
