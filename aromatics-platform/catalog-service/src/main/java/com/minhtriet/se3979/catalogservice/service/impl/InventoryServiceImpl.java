@@ -68,4 +68,36 @@ public class InventoryServiceImpl implements InventoryService {
             }
         }
     }
+
+    @Transactional
+    @Override
+    public void restoreStock(Long variantId, int quantity) {
+        String lockKey = "lock:inventory:variant:" + variantId;
+        RLock lock = redissonClient.getLock(lockKey);
+
+        try {
+            // Chờ lấy khóa 3 giây, khóa tự động nhả sau 10 giây
+            boolean acquired = lock.tryLock(3, 10, TimeUnit.SECONDS);
+            if (!acquired) {
+                throw new RuntimeException("Hệ thống bận, không thể khóa kho để hoàn trả");
+            }
+
+            Inventory inv = inventoryRepo.findByVariantId(variantId)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin tồn kho"));
+
+            // Cộng trả lại số lượng (Compensating Transaction)
+            inv.setQuantity(inv.getQuantity() + quantity);
+            inventoryRepo.save(inv);
+
+            log.info("[SAGA COMPENSATE] Đã HOÀN TRẢ thành công {} sản phẩm cho variantId: {}", quantity, variantId);
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Khóa kho bị gián đoạn", e);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+    }
 }

@@ -19,4 +19,9 @@ public class OrderEventPublisher {
         kafkaTemplate.send("order.created", order.getId().toString(), order);
         log.info("[KAFKA] Đã phát sóng sự kiện tạo đơn hàng thành công cho Mã đơn: {}", order.getOrderCode());
     }
+    public void publishOrderCancelled(Order order) {
+        // Gửi thông tin đơn hàng bị hủy vào topic "order.cancelled"
+        kafkaTemplate.send("order.cancelled", order.getId().toString(), order);
+        log.info("[KAFKA] Đã phát sóng sự kiện HỦY đơn hàng cho Mã đơn: {}", order.getOrderCode());
+    }
 }
