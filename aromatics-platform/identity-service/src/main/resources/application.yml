@@ -1,0 +1,39 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: identity-service
+
+  # Cấu hình kết nối MySQL
+  datasource:
+    url: jdbc:mysql://localhost:3306/identity_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh
+    username: root
+    password: 12345
+
+  # Cấu hình JPA & Hibernate
+  jpa:
+    hibernate:
+      ddl-auto: validate # Để Flyway tự quản lý bảng, JPA chỉ validate
+    show-sql: true
+    properties:
+      hibernate.dialect: org.hibernate.dialect.MySQLDialect
+
+  # Cấu hình Redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+# Cấu hình JWT
+jwt:
+  # Chữ ký bí mật (Đã mã hóa Base64). Chuỗi này ít nhất phải 256-bit (tương đương 32 ký tự).
+  secret: 4b6a4a6e744e6b726466384a51356f5a774652417757367838536b5952674261
+  # Thời hạn Access Token tính bằng mili-giây (15 phút = 900000)
+  expiration: 900000
+  refresh-expiration: 604800000

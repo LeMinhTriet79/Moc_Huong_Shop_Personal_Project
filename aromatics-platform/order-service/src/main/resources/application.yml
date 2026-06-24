@@ -1,0 +1,48 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: order-service
+
+  # C?u hình k?t n?i MySQL
+  datasource:
+    url: jdbc:mysql://localhost:3306/order_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh
+    username: root
+    password: 12345
+
+  # C?u hình JPA & Hibernate
+  jpa:
+    hibernate:
+      ddl-auto: none # ?? Flyway t? qu?n lý b?ng, JPA ch? validate
+    show-sql: true
+    properties:
+      hibernate.dialect: org.hibernate.dialect.MySQLDialect
+
+  # C?u hình Redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  # C?u hình Kafka Producer (?ã ???c ??a v? ?úng chu?n c?a Spring)
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+# C?u hình JWT
+jwt:
+  # Ch? ký bí m?t (?ã mã hóa Base64). Chu?i này ít nh?t ph?i 256-bit (t??ng ???ng 32 ký t?).
+  secret: 4b6a4a6e744e6b726466384a51356f5a774652417757367838536b5952674261
+  # Th?i h?n Access Token tính b?ng mili-giây (15 phút = 900000)
+  expiration: 900000
+  refresh-expiration: 604800000

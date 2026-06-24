@@ -1,0 +1,62 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        # 1. Định tuyến cho chức năng thực tế
+        - id: identity-service
+          uri: lb://identity-service
+          predicates:
+            - Path=/api/identity/**
+
+        - id: catalog-service
+          uri: lb://catalog-service
+          predicates:
+            - Path=/api/catalog/**
+
+        - id: order-service
+          uri: lb://order-service
+          predicates:
+            - Path=/api/order/**
+
+        # 2. Định tuyến bí mật để gom file cấu hình Swagger
+        - id: openapi-identity
+          uri: lb://identity-service
+          predicates:
+            - Path=/v3/api-docs/identity
+          filters:
+            - RewritePath=/v3/api-docs/identity, /v3/api-docs
+
+        - id: openapi-catalog
+          uri: lb://catalog-service
+          predicates:
+            - Path=/v3/api-docs/catalog
+          filters:
+            - RewritePath=/v3/api-docs/catalog, /v3/api-docs
+
+        - id: openapi-order
+          uri: lb://order-service
+          predicates:
+            - Path=/v3/api-docs/order
+          filters:
+            - RewritePath=/v3/api-docs/order, /v3/api-docs
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+# Gom 3 cái Swagger lại làm 1 thanh xổ xuống
+springdoc:
+  swagger-ui:
+    urls:
+      - name: 1. Phân hệ Tài khoản (Identity)
+        url: /v3/api-docs/identity
+      - name: 2. Phân hệ Sản phẩm (Catalog)
+        url: /v3/api-docs/catalog
+      - name: 3. Phân hệ Đặt hàng (Order)
+        url: /v3/api-docs/order
