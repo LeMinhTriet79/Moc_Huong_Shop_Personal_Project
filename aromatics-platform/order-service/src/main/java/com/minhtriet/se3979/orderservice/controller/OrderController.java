@@ -38,4 +38,12 @@ public class OrderController {
 
         return ResponseEntity.ok(order);
     }
+
+    // API: PUT /api/order/orders/{orderId}/cancel
+    @PutMapping("/{orderId}/cancel")
+    public ResponseEntity<Order> cancelOrder(@PathVariable Long orderId, HttpServletRequest httpRequest) {
+        Long userId = getUserIdFromRequest(httpRequest);
+        Order order = orderService.cancelOrder(userId, orderId);
+        return ResponseEntity.ok(order);
+    }
 }

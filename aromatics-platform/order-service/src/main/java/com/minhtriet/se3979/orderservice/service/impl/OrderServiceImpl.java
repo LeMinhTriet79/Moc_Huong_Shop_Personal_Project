@@ -104,4 +104,28 @@ public class OrderServiceImpl implements OrderService { // Nhớ implement Order
 
         return savedOrder;
     }
+
+    @Override
+    public Order cancelOrder(Long userId, Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+
+        // Kiểm tra xem đơn hàng có đúng là của user đang đăng nhập không
+        if (!order.getUserId().equals(userId)) {
+            throw new RuntimeException("Không có quyền hủy đơn hàng này");
+        }
+
+        // Chỉ cho phép hủy nếu đơn hàng đang chờ thanh toán
+        if (!"PENDING_PAYMENT".equals(order.getStatus())) {
+            throw new RuntimeException("Chỉ có thể hủy đơn hàng đang chờ thanh toán");
+        }
+
+        order.setStatus("CANCELLED");
+        Order cancelledOrder = orderRepository.save(order);
+
+        // Hét lên Kafka cho Catalog Service biết đường mà hoàn trả kho
+        eventPublisher.publishOrderCancelled(cancelledOrder);
+
+        return cancelledOrder;
+    }
 }

@@ -7,4 +7,6 @@ import org.springframework.transaction.annotation.Transactional;
 public interface OrderService {
     @Transactional
     Order checkout(Long userId, CheckoutRequest request);
+
+    Order cancelOrder(Long userId, Long orderId);
 }
