@@ -1,5 +1,7 @@
 package com.minhtriet.se3979.notificationservice.kafka;
 
+import com.minhtriet.se3979.notificationservice.service.EmailService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
@@ -8,8 +10,10 @@ import java.util.Map;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class OrderEventListener {
 
+    private final EmailService emailService;
     // Lắng nghe chính xác cái topic mà Order Service vừa ném dữ liệu vào
     @KafkaListener(topics = "order.created", groupId = "notification-group")
     public void handleOrderCreated(Map<String, Object> orderData) {
@@ -28,7 +32,9 @@ public class OrderEventListener {
             log.info("💰 Tổng tiền thu hộ (COD): {} VNĐ", totalAmount);
             log.info("==================================================");
 
-            // Sau này ở đây bạn sẽ gọi EmailService.sendEmail(...) tích hợp SendGrid hoặc MailTrap
+            String testEmail = "trietleminh7979@gmail.com";
+            // Gọi hàm gửi thư
+            emailService.sendInvoiceEmail(testEmail, orderCode, totalAmount);
         } catch (Exception e) {
             log.error("Lỗi khi xử lý tin nhắn Kafka: {}", e.getMessage());
         }

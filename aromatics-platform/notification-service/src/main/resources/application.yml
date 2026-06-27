@@ -5,13 +5,13 @@ spring:
   application:
     name: notification-service
 
-  # C?u hình k?t n?i MySQL
+  # C?u hï¿½nh k?t n?i MySQL
   datasource:
     url: jdbc:mysql://localhost:3306/notification_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh
     username: root
     password: 12345
 
-  # C?u hình JPA & Hibernate
+  # C?u hï¿½nh JPA & Hibernate
   jpa:
     hibernate:
       ddl-auto: none
@@ -19,13 +19,13 @@ spring:
     properties:
       hibernate.dialect: org.hibernate.dialect.MySQLDialect
 
-  # C?u hình Redis
+  # C?u hï¿½nh Redis
   data:
     redis:
       host: localhost
       port: 6379
 
-  # C?u hình Kafka Consumer
+  # C?u hï¿½nh Kafka Consumer
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
@@ -35,16 +35,28 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "*"
-        # BÍ QUY?T GI?I QUY?T L?I VÒNG L?P N?M ? ?ÂY:
+        # Bï¿½ QUY?T GI?I QUY?T L?I Vï¿½NG L?P N?M ? ?ï¿½Y:
         spring.json.value.default.type: java.util.HashMap
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: "letriet22042004@gmail.com"
+    password: "fzctnhjqphtvudbw"
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka/
 
-# C?u hình JWT
+# C?u hï¿½nh JWT
 jwt:
   secret: 4b6a4a6e744e6b726466384a51356f5a774652417757367838536b5952674261
   expiration: 900000
   refresh-expiration: 604800000
+
