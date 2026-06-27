@@ -23,7 +23,7 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // Cho phép truy cập giao diện Swagger UI mà không cần đăng nhập
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/error").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/error", "/api/order/payment/vnpay-return").permitAll()
                         // Tất cả các API của giỏ hàng và đơn hàng ĐỀU PHẢI đăng nhập (có token)
                         .requestMatchers("/api/order/**").authenticated()
                         .anyRequest().authenticated()
