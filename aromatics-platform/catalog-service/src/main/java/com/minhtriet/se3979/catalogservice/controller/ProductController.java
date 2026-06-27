@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -27,5 +28,13 @@ public class ProductController {
             @RequestParam(defaultValue = "12") int size) {
 
         return ResponseEntity.ok(productService.searchProducts(keyword, categoryId, minPrice, maxPrice, PageRequest.of(page, size)));
+    }
+
+
+    @GetMapping ("/test")// API tạo sản phẩm mới
+    @PreAuthorize("hasRole('ADMIN')") // <--- CHỈ ADMIN MỚI ĐƯỢC GỌI HÀM NÀY
+    public ResponseEntity<?> createProduct() {
+        // Code tạo sản phẩm của bạn ở đây...
+        return ResponseEntity.ok("Tạo sản phẩm thành công!");
     }
 }
