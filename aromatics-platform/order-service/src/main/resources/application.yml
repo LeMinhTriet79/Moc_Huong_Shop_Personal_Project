@@ -5,27 +5,27 @@ spring:
   application:
     name: order-service
 
-  # C?u hình k?t n?i MySQL
+  # C?u hï¿½nh k?t n?i MySQL
   datasource:
     url: jdbc:mysql://localhost:3306/order_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh
     username: root
     password: 12345
 
-  # C?u hình JPA & Hibernate
+  # C?u hï¿½nh JPA & Hibernate
   jpa:
     hibernate:
-      ddl-auto: none # ?? Flyway t? qu?n lý b?ng, JPA ch? validate
+      ddl-auto: none # ?? Flyway t? qu?n lï¿½ b?ng, JPA ch? validate
     show-sql: true
     properties:
       hibernate.dialect: org.hibernate.dialect.MySQLDialect
 
-  # C?u hình Redis
+  # C?u hï¿½nh Redis
   data:
     redis:
       host: localhost
       port: 6379
 
-  # C?u hình Kafka Producer (?ã ???c ??a v? ?úng chu?n c?a Spring)
+  # C?u hï¿½nh Kafka Producer (?ï¿½ ???c ??a v? ?ï¿½ng chu?n c?a Spring)
   kafka:
     bootstrap-servers: localhost:9092
     producer:
@@ -39,10 +39,16 @@ eureka:
     service-url:
       defaultZone: http://localhost:8761/eureka/
 
-# C?u hình JWT
+# C?u hï¿½nh JWT
 jwt:
-  # Ch? ký bí m?t (?ã mã hóa Base64). Chu?i này ít nh?t ph?i 256-bit (t??ng ???ng 32 ký t?).
+  # Ch? kï¿½ bï¿½ m?t (?ï¿½ mï¿½ hï¿½a Base64). Chu?i nï¿½y ï¿½t nh?t ph?i 256-bit (t??ng ???ng 32 kï¿½ t?).
   secret: 4b6a4a6e744e6b726466384a51356f5a774652417757367838536b5952674261
-  # Th?i h?n Access Token tính b?ng mili-giây (15 phút = 900000)
+  # Th?i h?n Access Token tï¿½nh b?ng mili-giï¿½y (15 phï¿½t = 900000)
   expiration: 900000
   refresh-expiration: 604800000
+
+vnpay:
+  tmn-code: "X776TT2O"
+  hash-secret: "5TFWJWRWYJEU75B7FYIR2VVBU04HUORT"
+  pay-url: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+  return-url: "http://localhost:8080/api/order/payment/vnpay-return"
