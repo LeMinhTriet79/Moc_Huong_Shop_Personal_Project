@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Hóa đơn mua hàng</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px; }
+        .container { max-width: 600px; background-color: #ffffff; margin: 0 auto; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .header { text-align: center; border-bottom: 2px solid #27ae60; padding-bottom: 10px; margin-bottom: 20px; }
+        .header h1 { color: #27ae60; margin: 0; }
+        .content { font-size: 16px; color: #333333; line-height: 1.6; }
+        .order-info { background-color: #e8f8f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .total { font-size: 20px; font-weight: bold; color: #c0392b; text-align: right; }
+        .footer { margin-top: 30px; text-align: center; font-size: 14px; color: #7f8c8d; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>MỘC HƯƠNG SHOP</h1>
+        <p>Cảm ơn bạn đã tin tưởng và mua sắm!</p>
+    </div>
+    <div class="content">
+        <p>Xin chào,</p>
+        <p>Hệ thống vừa ghi nhận đơn đặt hàng của bạn với các thông tin sau:</p>
+
+        <div class="order-info">
+            <p><strong>Mã đơn hàng:</strong> <span th:text="${orderCode}">MH-XXXXXX</span></p>
+            <p><strong>Ngày đặt:</strong> <span th:text="${orderDate}">01/01/2026</span></p>
+        </div>
+
+        <p class="total">Tổng thanh toán: <span th:text="${totalAmount} + ' VNĐ'">0 VNĐ</span></p>
+
+        <p>Đơn hàng của bạn sẽ sớm được đóng gói và giao cho đơn vị vận chuyển. Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ hotline: <strong>1900 8888</strong>.</p>
+    </div>
+    <div class="footer">
+        <p>&copy; 2026 Mộc Hương Shop - Hương Thơm Từ Thiên Nhiên.</p>
+    </div>
+</div>
+</body>
+</html>
