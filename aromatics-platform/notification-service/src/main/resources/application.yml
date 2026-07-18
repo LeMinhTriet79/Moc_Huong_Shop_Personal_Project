@@ -1,17 +1,23 @@
 server:
   port: 8084
 
+management:
+  tracing:
+    sampling:
+      probability: 1.0 # 1.0 nghĩa là ghi hình 100% các request (để test)
 spring:
+  zipkin:
+    base-url: http://localhost:9411
   application:
     name: notification-service
 
-  # C?u h�nh k?t n?i MySQL
+  # Cấu hình kết nối MySQL
   datasource:
-    url: jdbc:mysql://localhost:3306/notification_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh
+    url: jdbc:mysql://localhost:3306/notification_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
     username: root
     password: 12345
 
-  # C?u h�nh JPA & Hibernate
+  # Cấu hình JPA & Hibernate
   jpa:
     hibernate:
       ddl-auto: none
@@ -19,24 +25,29 @@ spring:
     properties:
       hibernate.dialect: org.hibernate.dialect.MySQLDialect
 
-  # C?u h�nh Redis
+  # Cấu hình Redis
   data:
     redis:
       host: localhost
       port: 6379
 
-  # C?u h�nh Kafka Consumer
+  # Cấu hình Kafka Consumer
+  # Cấu hình Kafka Consumer
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
-      group-id: notification-group
-      auto-offset-reset: earliest
+      # Đổi sang v3 để bỏ qua cái tin nhắn lỗi đang bị kẹt
+      group-id: notification-group-v3
+      auto-offset-reset: latest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "*"
-        # B� QUY?T GI?I QUY?T L?I V�NG L?P N?M ? ?�Y:
         spring.json.value.default.type: java.util.HashMap
+        # BÍ QUYẾT GIẢI QUYẾT LỖI CLASS NOT FOUND: Phớt lờ nhãn mác của bên gửi
+        spring.json.use.type.headers: false
+    listener:
+      observation-enabled: true
 
   mail:
     host: smtp.gmail.com
@@ -54,9 +65,8 @@ eureka:
     service-url:
       defaultZone: http://localhost:8761/eureka/
 
-# C?u h�nh JWT
+# Cấu hình JWT
 jwt:
   secret: 4b6a4a6e744e6b726466384a51356f5a774652417757367838536b5952674261
   expiration: 900000
   refresh-expiration: 604800000
-
