@@ -1,5 +1,7 @@
 package com.minhtriet.se3979.catalogservice.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.minhtriet.se3979.catalogservice.dto.request.ProductCreateRequest;
 import com.minhtriet.se3979.catalogservice.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -7,8 +9,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/catalog/products")
@@ -16,6 +20,7 @@ import java.math.BigDecimal;
 public class ProductController {
 
     private final ProductService productService;
+    private final ObjectMapper objectMapper; // <--- CÔNG CỤ PARSE JSON THẦN THÁNH
 
     // API: GET /api/catalog/products?keyword=nhang&page=0&size=12
     @GetMapping
@@ -30,11 +35,29 @@ public class ProductController {
         return ResponseEntity.ok(productService.searchProducts(keyword, categoryId, minPrice, maxPrice, PageRequest.of(page, size)));
     }
 
+    // BÙA CHÚ BẢO VỆ: Chỉ STAFF và ADMIN mới được gọi API này
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+    @PostMapping(consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> createProduct(
+            @RequestPart("product") String productJson, // <--- HỨNG BẰNG STRING ĐỂ NÉ LỖI 415
+            @RequestPart(value = "images", required = false) List<MultipartFile> files
+    ) {
+        try {
+            // Tự tay dịch chuỗi String thành Object DTO
+            ProductCreateRequest request = objectMapper.readValue(productJson, ProductCreateRequest.class);
 
-    @GetMapping ("/test")// API tạo sản phẩm mới
-    @PreAuthorize("hasRole('ADMIN')") // <--- CHỈ ADMIN MỚI ĐƯỢC GỌI HÀM NÀY
-    public ResponseEntity<?> createProduct() {
-        // Code tạo sản phẩm của bạn ở đây...
-        return ResponseEntity.ok("Tạo sản phẩm thành công!");
+            // Đẩy xuống Service xử lý như bình thường
+            Object response = productService.createProductWithImages(request, files);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Lỗi định dạng JSON hoặc Upload: " + e.getMessage());
+        }
+    }
+
+    // API Lấy Chi tiết Sản Phẩm (Dành cho tất cả mọi người)
+    @GetMapping("/{slug}")
+    public ResponseEntity<?> getProductDetail(@PathVariable String slug) {
+        Object response = productService.getProductDetail(slug);
+        return ResponseEntity.ok(response);
     }
 }

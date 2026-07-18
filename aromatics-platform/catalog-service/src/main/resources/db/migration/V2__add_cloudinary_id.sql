@@ -1,0 +1,1 @@
+ALTER TABLE categories ADD COLUMN cloudinary_public_id VARCHAR(255) NULL;

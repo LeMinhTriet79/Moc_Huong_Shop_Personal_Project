@@ -20,4 +20,6 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM Inventory i WHERE i.variant.id = :variantId")
     Optional<Inventory> findByVariantIdWithLock(@Param("variantId") Long variantId);
+
+    void deleteByVariantId(Long variantId);
 }
