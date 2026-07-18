@@ -54,3 +54,8 @@ jwt:
   expiration: 900000
   refresh-expiration: 604800000
 
+
+# Thêm vào dưới cùng file application.yml
+cloudinary:
+  url: "cloudinary://135985971514938:RDfYcvyUFfsz4N5vODi3Ac_Cf8k@drnufjdn2"
+
