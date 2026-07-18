@@ -1,13 +1,21 @@
 server:
   port: 8081
 
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+
 spring:
+  # Chú ý: chữ spring này phải nằm sát lề trái, đừng thụt vào trong
+  zipkin:
+    base-url: http://localhost:9411
   application:
     name: identity-service
 
   # Cấu hình kết nối MySQL
   datasource:
-    url: jdbc:mysql://localhost:3306/identity_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh
+    url: jdbc:mysql://localhost:3306/identity_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
     username: root
     password: 12345
 
