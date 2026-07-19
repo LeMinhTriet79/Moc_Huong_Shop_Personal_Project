@@ -21,9 +21,8 @@ import java.util.List;
 public class ProductController {
 
     private final ProductService productService;
-    private final ObjectMapper objectMapper; // <--- CÔNG CỤ PARSE JSON THẦN THÁNH
+    private final ObjectMapper objectMapper;
 
-    // API: GET /api/catalog/products?keyword=nhang&page=0&size=12
     @GetMapping
     public ResponseEntity<Page<Object>> searchProducts(
             @RequestParam(required = false) String keyword,
@@ -36,18 +35,30 @@ public class ProductController {
         return ResponseEntity.ok(productService.searchProducts(keyword, categoryId, minPrice, maxPrice, PageRequest.of(page, size)));
     }
 
-    // BÙA CHÚ BẢO VỆ: Chỉ STAFF và ADMIN mới được gọi API này
+    // API: Lấy danh sách sản phẩm trong thùng rác
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+    @GetMapping("/inactive")
+    public ResponseEntity<Page<Object>> getInactiveProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+
+        return ResponseEntity.ok(productService.getInactiveProducts(PageRequest.of(page, size)));
+    }
+
+    @GetMapping("/{slug}")
+    public ResponseEntity<?> getProductDetail(@PathVariable String slug) {
+        Object response = productService.getProductDetail(slug);
+        return ResponseEntity.ok(response);
+    }
+
     @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
     @PostMapping(consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> createProduct(
-            @RequestPart("product") String productJson, // <--- HỨNG BẰNG STRING ĐỂ NÉ LỖI 415
+            @RequestPart("product") String productJson,
             @RequestPart(value = "images", required = false) List<MultipartFile> files
     ) {
         try {
-            // Tự tay dịch chuỗi String thành Object DTO
             ProductCreateRequest request = objectMapper.readValue(productJson, ProductCreateRequest.class);
-
-            // Đẩy xuống Service xử lý như bình thường
             Object response = productService.createProductWithImages(request, files);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -55,14 +66,6 @@ public class ProductController {
         }
     }
 
-    // API Lấy Chi tiết Sản Phẩm (Dành cho tất cả mọi người)
-    @GetMapping("/{slug}")
-    public ResponseEntity<?> getProductDetail(@PathVariable String slug) {
-        Object response = productService.getProductDetail(slug);
-        return ResponseEntity.ok(response);
-    }
-
-    // CẬP NHẬT SẢN PHẨM (Sửa thông minh + Quản lý thư viện ảnh)
     @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
     @PutMapping(value = "/{id}", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> updateProduct(
@@ -83,4 +86,11 @@ public class ProductController {
         }
     }
 
+    // API: Đưa sản phẩm vào thùng rác (Xóa mềm)
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteProduct(@PathVariable Long id) {
+        productService.deleteProduct(id);
+        return ResponseEntity.ok("Đã đưa sản phẩm vào thùng rác thành công!");
+    }
 }

@@ -101,6 +101,7 @@ public class ProductServiceImpl implements ProductService {
                 .brand(request.getBrand())
                 .tags(request.getTags())
                 .isPublished(true)
+                .isActive(true)
                 .build();
         Product savedProduct = productRepository.save(product);
 
@@ -142,33 +143,19 @@ public class ProductServiceImpl implements ProductService {
         return "Thêm sản phẩm, gắn ảnh và tạo kho thành công!";
     }
 
+    // XÓA MỀM (SOFT DELETE) - Rất sạch sẽ và an toàn
     @Transactional
     @Override
     public void deleteProduct(Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm cần xóa!"));
 
-        List<ProductImage> images = product.getImages();
-        if (images != null && !images.isEmpty()) {
-            for (ProductImage img : images) {
-                try {
-                    if (img.getCloudinaryPublicId() != null) {
-                        cloudinaryService.deleteImage(img.getCloudinaryPublicId());
-                    }
-                } catch (Exception e) {
-                    System.err.println("Lỗi dọn rác Cloudinary: " + e.getMessage());
-                }
-            }
+        if (!product.getIsActive()) {
+            throw new RuntimeException("Sản phẩm này đã bị xóa (ẩn) từ trước rồi!");
         }
 
-        List<ProductVariant> variants = product.getVariants();
-        if (variants != null && !variants.isEmpty()) {
-            for (ProductVariant variant : variants) {
-                inventoryRepository.deleteByVariantId(variant.getId());
-            }
-        }
-
-        productRepository.delete(product);
+        product.setIsActive(false);
+        productRepository.save(product);
     }
 
     @Transactional
@@ -177,7 +164,6 @@ public class ProductServiceImpl implements ProductService {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm!"));
 
-        // 1. CẬP NHẬT THÔNG TIN CƠ BẢN (Text)
         if (request != null) {
             if (request.getName() != null && !request.getName().isEmpty()) {
                 product.setName(request.getName());
@@ -202,20 +188,16 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
-        // 2. XỬ LÝ ẢNH BỊ XÓA (Xóa trên Cloudinary và tháo gỡ khỏi Product - FIX LỖI MERGE HIBERNATE)
         if (request != null && request.getDeletedImageIds() != null && !request.getDeletedImageIds().isEmpty()) {
-            // Lọc ra danh sách ảnh cần xóa đang thuộc về sản phẩm này
             List<ProductImage> imagesToDelete = product.getImages().stream()
                     .filter(img -> request.getDeletedImageIds().contains(img.getId()))
                     .toList();
 
             for (ProductImage img : imagesToDelete) {
                 try {
-                    // Xóa ảnh gốc trên Cloudinary
                     if (img.getCloudinaryPublicId() != null) {
                         cloudinaryService.deleteImage(img.getCloudinaryPublicId());
                     }
-                    // Đá ảnh ra khỏi danh sách của Product để kích hoạt orphanRemoval = true
                     product.getImages().remove(img);
                 } catch (Exception e) {
                     System.err.println("Lỗi xóa ảnh cũ: " + e.getMessage());
@@ -223,7 +205,6 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
-        // 3. XỬ LÝ THÊM ẢNH MỚI (Nếu Admin có up thêm file)
         if (newImages != null && !newImages.isEmpty()) {
             int currentMaxSortOrder = product.getImages().stream()
                     .mapToInt(ProductImage::getSortOrder)
@@ -249,9 +230,15 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
-        // Lưu sản phẩm an toàn và trả về câu thông báo nhẹ nhàng
         productRepository.save(product);
         return "Cập nhật sản phẩm và thư viện ảnh thành công!";
+    }
+
+    // THÙNG RÁC
+    @Override
+    public Page<Object> getInactiveProducts(Pageable pageable) {
+        Page<Product> products = productRepository.findByIsActiveFalse(pageable);
+        return products.map(this::mapToResponse).map(dto -> (Object) dto);
     }
 
     private ProductResponse mapToResponse(Product p) {
@@ -280,7 +267,6 @@ public class ProductServiceImpl implements ProductService {
                 .build();
     }
 
-    // Hàm tiện ích chuẩn hóa Slug tiếng Việt
     private String generateSlug(String input) {
         if (input == null || input.isEmpty()) return "";
         String temp = Normalizer.normalize(input, Normalizer.Form.NFD);

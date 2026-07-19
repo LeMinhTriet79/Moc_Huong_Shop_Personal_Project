@@ -15,4 +15,5 @@ public interface ProductService {
     Object createProductWithImages(ProductCreateRequest request, List<MultipartFile> files);
     void deleteProduct(Long productId);
     Object updateProduct(Long productId, ProductUpdateRequest request, List<MultipartFile> newImages);
+    Page<Object> getInactiveProducts(Pageable pageable); // Lấy danh sách thùng rác
 }
