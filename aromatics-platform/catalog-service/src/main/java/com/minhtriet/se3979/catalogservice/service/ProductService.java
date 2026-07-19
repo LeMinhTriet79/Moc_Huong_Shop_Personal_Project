@@ -1,6 +1,7 @@
 package com.minhtriet.se3979.catalogservice.service;
 
 import com.minhtriet.se3979.catalogservice.dto.request.ProductCreateRequest;
+import com.minhtriet.se3979.catalogservice.dto.request.ProductUpdateRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
@@ -13,4 +14,5 @@ public interface ProductService {
     Object getProductDetail(String slug);
     Object createProductWithImages(ProductCreateRequest request, List<MultipartFile> files);
     public void deleteProduct(Long productId);
+    Object updateProduct(Long productId, ProductUpdateRequest request, List<MultipartFile> newImages);
 }
