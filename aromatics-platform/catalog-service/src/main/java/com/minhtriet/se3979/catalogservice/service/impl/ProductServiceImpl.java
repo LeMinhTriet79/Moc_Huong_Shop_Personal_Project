@@ -202,13 +202,21 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
-        // 2. XỬ LÝ ẢNH BỊ XÓA (Xóa trên Cloudinary và Xóa dưới Database)
+        // 2. XỬ LÝ ẢNH BỊ XÓA (Xóa trên Cloudinary và tháo gỡ khỏi Product - FIX LỖI MERGE HIBERNATE)
         if (request != null && request.getDeletedImageIds() != null && !request.getDeletedImageIds().isEmpty()) {
-            List<ProductImage> imagesToDelete = productImageRepository.findAllById(request.getDeletedImageIds());
+            // Lọc ra danh sách ảnh cần xóa đang thuộc về sản phẩm này
+            List<ProductImage> imagesToDelete = product.getImages().stream()
+                    .filter(img -> request.getDeletedImageIds().contains(img.getId()))
+                    .toList();
+
             for (ProductImage img : imagesToDelete) {
                 try {
-                    cloudinaryService.deleteImage(img.getCloudinaryPublicId());
-                    productImageRepository.delete(img);
+                    // Xóa ảnh gốc trên Cloudinary
+                    if (img.getCloudinaryPublicId() != null) {
+                        cloudinaryService.deleteImage(img.getCloudinaryPublicId());
+                    }
+                    // Đá ảnh ra khỏi danh sách của Product để kích hoạt orphanRemoval = true
+                    product.getImages().remove(img);
                 } catch (Exception e) {
                     System.err.println("Lỗi xóa ảnh cũ: " + e.getMessage());
                 }
@@ -241,7 +249,7 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
-        // CHỖ NÀY ĐÃ ĐƯỢC SỬA ĐỂ TRÁNH LỖI JACKSON PROXY 500
+        // Lưu sản phẩm an toàn và trả về câu thông báo nhẹ nhàng
         productRepository.save(product);
         return "Cập nhật sản phẩm và thư viện ảnh thành công!";
     }
