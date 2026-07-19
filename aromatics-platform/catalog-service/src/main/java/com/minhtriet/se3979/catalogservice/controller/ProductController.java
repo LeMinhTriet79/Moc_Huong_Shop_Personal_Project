@@ -2,6 +2,7 @@ package com.minhtriet.se3979.catalogservice.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.minhtriet.se3979.catalogservice.dto.request.ProductCreateRequest;
+import com.minhtriet.se3979.catalogservice.dto.request.ProductUpdateRequest;
 import com.minhtriet.se3979.catalogservice.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -60,4 +61,26 @@ public class ProductController {
         Object response = productService.getProductDetail(slug);
         return ResponseEntity.ok(response);
     }
+
+    // CẬP NHẬT SẢN PHẨM (Sửa thông minh + Quản lý thư viện ảnh)
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+    @PutMapping(value = "/{id}", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> updateProduct(
+            @PathVariable Long id,
+            @RequestPart(value = "product", required = false) String productJson,
+            @RequestPart(value = "newImages", required = false) List<MultipartFile> newImages
+    ) {
+        try {
+            ProductUpdateRequest request = null;
+            if (productJson != null && !productJson.isEmpty()) {
+                request = objectMapper.readValue(productJson, ProductUpdateRequest.class);
+            }
+
+            Object response = productService.updateProduct(id, request, newImages);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Lỗi dữ liệu đầu vào: " + e.getMessage());
+        }
+    }
+
 }

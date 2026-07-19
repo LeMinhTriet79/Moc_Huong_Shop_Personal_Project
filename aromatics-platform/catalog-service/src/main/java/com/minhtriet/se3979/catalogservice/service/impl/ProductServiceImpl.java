@@ -177,6 +177,7 @@ public class ProductServiceImpl implements ProductService {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm!"));
 
+        // 1. CẬP NHẬT THÔNG TIN CƠ BẢN (Text)
         if (request != null) {
             if (request.getName() != null && !request.getName().isEmpty()) {
                 product.setName(request.getName());
@@ -201,6 +202,7 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
+        // 2. XỬ LÝ ẢNH BỊ XÓA (Xóa trên Cloudinary và Xóa dưới Database)
         if (request != null && request.getDeletedImageIds() != null && !request.getDeletedImageIds().isEmpty()) {
             List<ProductImage> imagesToDelete = productImageRepository.findAllById(request.getDeletedImageIds());
             for (ProductImage img : imagesToDelete) {
@@ -213,6 +215,7 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
+        // 3. XỬ LÝ THÊM ẢNH MỚI (Nếu Admin có up thêm file)
         if (newImages != null && !newImages.isEmpty()) {
             int currentMaxSortOrder = product.getImages().stream()
                     .mapToInt(ProductImage::getSortOrder)
@@ -238,7 +241,9 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
-        return productRepository.save(product);
+        // CHỖ NÀY ĐÃ ĐƯỢC SỬA ĐỂ TRÁNH LỖI JACKSON PROXY 500
+        productRepository.save(product);
+        return "Cập nhật sản phẩm và thư viện ảnh thành công!";
     }
 
     private ProductResponse mapToResponse(Product p) {
