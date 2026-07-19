@@ -54,6 +54,10 @@ public class ProductVariant {
     @Builder.Default
     private Integer sortOrder = 0;
 
+    // Thêm quan hệ ngược lại để ProductVariant có thể lấy được số lượng tồn kho
+    @OneToOne(mappedBy = "variant", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private Inventory inventory;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

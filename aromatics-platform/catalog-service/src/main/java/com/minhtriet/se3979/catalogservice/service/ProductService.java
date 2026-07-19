@@ -13,6 +13,6 @@ public interface ProductService {
     Page<Object> searchProducts(String keyword, Long categoryId, BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable);
     Object getProductDetail(String slug);
     Object createProductWithImages(ProductCreateRequest request, List<MultipartFile> files);
-    public void deleteProduct(Long productId);
+    void deleteProduct(Long productId);
     Object updateProduct(Long productId, ProductUpdateRequest request, List<MultipartFile> newImages);
 }

@@ -1,6 +1,7 @@
 package com.minhtriet.se3979.catalogservice.service.impl;
 
 import com.minhtriet.se3979.catalogservice.dto.request.ProductCreateRequest;
+import com.minhtriet.se3979.catalogservice.dto.request.ProductUpdateRequest;
 import com.minhtriet.se3979.catalogservice.dto.response.ProductDetailResponse;
 import com.minhtriet.se3979.catalogservice.dto.response.ProductResponse;
 import com.minhtriet.se3979.catalogservice.entity.*;
@@ -15,36 +16,34 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
-
     private final CategoryRepository categoryRepository;
     private final ProductImageRepository productImageRepository;
     private final CloudinaryService cloudinaryService;
     private final ProductVariantRepository productVariantRepository;
     private final InventoryRepository inventoryRepository;
+
     @Override
     public Page<Object> searchProducts(String keyword, Long categoryId, BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable) {
         Page<Product> products = productRepository.searchProducts(keyword, categoryId, minPrice, maxPrice, pageable);
-
-        // Map Entity sang DTO
         return products.map(this::mapToResponse).map(dto -> (Object) dto);
     }
 
     @Override
     public Object getProductDetail(String slug) {
-        // 1. Tìm sản phẩm theo Slug
         Product product = productRepository.findBySlug(slug)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với slug: " + slug));
 
-        // 2. Chuyển đổi danh sách Hình ảnh
         List<ProductDetailResponse.ImageDto> imageDtos = product.getImages().stream()
                 .map(img -> ProductDetailResponse.ImageDto.builder()
                         .id(img.getId())
@@ -53,12 +52,10 @@ public class ProductServiceImpl implements ProductService {
                         .build())
                 .toList();
 
-        // 3. Chuyển đổi danh sách Phiên bản và lôi số lượng từ kho ra
         List<ProductDetailResponse.VariantDto> variantDtos = product.getVariants().stream()
                 .map(var -> {
-                    // Lấy số lượng tồn kho thực tế từ bảng Inventory
                     Integer stock = inventoryRepository.findByVariantId(var.getId())
-                            .map(com.minhtriet.se3979.catalogservice.entity.Inventory::getQuantity)
+                            .map(Inventory::getQuantity)
                             .orElse(0);
 
                     return ProductDetailResponse.VariantDto.builder()
@@ -71,7 +68,6 @@ public class ProductServiceImpl implements ProductService {
                 })
                 .toList();
 
-        // 4. Lắp ráp thành rổ Data khổng lồ trả về
         return ProductDetailResponse.builder()
                 .id(product.getId())
                 .name(product.getName())
@@ -91,12 +87,10 @@ public class ProductServiceImpl implements ProductService {
     @Transactional
     @Override
     public Object createProductWithImages(ProductCreateRequest request, List<MultipartFile> files) {
-
-        // 1. TÌM CATEGORY & LƯU PRODUCT (Như code cũ bạn đang chạy)
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy danh mục!"));
 
-        String slug = request.getName().toLowerCase().replaceAll("[^a-z0-9\\-]", "-") + "-" + System.currentTimeMillis();
+        String slug = generateSlug(request.getName()) + "-" + System.currentTimeMillis();
 
         Product product = Product.builder()
                 .category(category)
@@ -110,7 +104,6 @@ public class ProductServiceImpl implements ProductService {
                 .build();
         Product savedProduct = productRepository.save(product);
 
-        // 2. UPLOAD ẢNH LÊN CLOUDINARY (Như code cũ)
         if (files != null && !files.isEmpty()) {
             List<ProductImage> productImages = new ArrayList<>();
             for (int i = 0; i < files.size(); i++) {
@@ -131,17 +124,15 @@ public class ProductServiceImpl implements ProductService {
             productImageRepository.saveAll(productImages);
         }
 
-        // 3. (MỚI) TẠO PHIÊN BẢN MẶC ĐỊNH CHO SẢN PHẨM
         ProductVariant variant = ProductVariant.builder()
                 .product(savedProduct)
                 .sku(request.getSku())
-                .variantName("Default") // Tên mặc định
+                .variantName("Default")
                 .price(request.getPrice())
                 .isActive(true)
                 .build();
         ProductVariant savedVariant = productVariantRepository.save(variant);
 
-        // 4. (MỚI) ĐỔ HÀNG VÀO KHO CHO PHIÊN BẢN ĐÓ
         Inventory inventory = Inventory.builder()
                 .variant(savedVariant)
                 .quantity(request.getStockQuantity())
@@ -152,11 +143,11 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Transactional
+    @Override
     public void deleteProduct(Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm cần xóa!"));
 
-        // 1. Dọn rác Cloudinary
         List<ProductImage> images = product.getImages();
         if (images != null && !images.isEmpty()) {
             for (ProductImage img : images) {
@@ -170,7 +161,6 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
-        // 2. (BỔ SUNG) Xóa Tồn kho (Inventory) trước để tránh lỗi Khóa ngoại
         List<ProductVariant> variants = product.getVariants();
         if (variants != null && !variants.isEmpty()) {
             for (ProductVariant variant : variants) {
@@ -178,11 +168,79 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
-        // 3. Bây giờ mới an toàn để xóa Product (Sẽ tự động kéo theo Variant và Image)
         productRepository.delete(product);
     }
 
-    // Hàm tiện ích chuyển Entity sang DTO
+    @Transactional
+    @Override
+    public Object updateProduct(Long productId, ProductUpdateRequest request, List<MultipartFile> newImages) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm!"));
+
+        if (request != null) {
+            if (request.getName() != null && !request.getName().isEmpty()) {
+                product.setName(request.getName());
+                product.setSlug(generateSlug(request.getName()) + "-" + System.currentTimeMillis());
+            }
+            if (request.getCategoryId() != null) {
+                Category category = categoryRepository.findById(request.getCategoryId())
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy danh mục!"));
+                product.setCategory(category);
+            }
+            if (request.getShortDescription() != null) product.setShortDescription(request.getShortDescription());
+            if (request.getDescription() != null) product.setDescription(request.getDescription());
+            if (request.getBrand() != null) product.setBrand(request.getBrand());
+            if (request.getIsPublished() != null) product.setIsPublished(request.getIsPublished());
+
+            if (product.getVariants() != null && !product.getVariants().isEmpty()) {
+                ProductVariant defaultVariant = product.getVariants().get(0);
+                if (request.getPrice() != null) defaultVariant.setPrice(request.getPrice());
+                if (request.getQuantity() != null && defaultVariant.getInventory() != null) {
+                    defaultVariant.getInventory().setQuantity(request.getQuantity());
+                }
+            }
+        }
+
+        if (request != null && request.getDeletedImageIds() != null && !request.getDeletedImageIds().isEmpty()) {
+            List<ProductImage> imagesToDelete = productImageRepository.findAllById(request.getDeletedImageIds());
+            for (ProductImage img : imagesToDelete) {
+                try {
+                    cloudinaryService.deleteImage(img.getCloudinaryPublicId());
+                    productImageRepository.delete(img);
+                } catch (Exception e) {
+                    System.err.println("Lỗi xóa ảnh cũ: " + e.getMessage());
+                }
+            }
+        }
+
+        if (newImages != null && !newImages.isEmpty()) {
+            int currentMaxSortOrder = product.getImages().stream()
+                    .mapToInt(ProductImage::getSortOrder)
+                    .max().orElse(0);
+
+            for (MultipartFile file : newImages) {
+                if (file.isEmpty()) continue;
+                try {
+                    Map<String, Object> uploadResult = cloudinaryService.uploadImage(file);
+                    currentMaxSortOrder++;
+
+                    ProductImage newImage = ProductImage.builder()
+                            .product(product)
+                            .cloudinaryPublicId(uploadResult.get("public_id").toString())
+                            .imageUrl(uploadResult.get("secure_url").toString())
+                            .isPrimary(false)
+                            .sortOrder(currentMaxSortOrder)
+                            .build();
+                    product.getImages().add(newImage);
+                } catch (Exception e) {
+                    throw new RuntimeException("Lỗi upload ảnh mới lên mây!", e);
+                }
+            }
+        }
+
+        return productRepository.save(product);
+    }
+
     private ProductResponse mapToResponse(Product p) {
         String primaryImage = p.getImages().stream()
                 .filter(ProductImage::getIsPrimary)
@@ -207,5 +265,17 @@ public class ProductServiceImpl implements ProductService {
                 .primaryImageUrl(primaryImage)
                 .startingPrice(startPrice)
                 .build();
+    }
+
+    // Hàm tiện ích chuẩn hóa Slug tiếng Việt
+    private String generateSlug(String input) {
+        if (input == null || input.isEmpty()) return "";
+        String temp = Normalizer.normalize(input, Normalizer.Form.NFD);
+        Pattern pattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
+        String slug = pattern.matcher(temp).replaceAll("");
+        slug = slug.replaceAll("Đ", "D").replaceAll("đ", "d");
+        slug = slug.toLowerCase().replaceAll("[^a-z0-9\\-]", "-");
+        slug = slug.replaceAll("-+", "-");
+        return slug.replaceAll("^-|-$", "");
     }
 }
