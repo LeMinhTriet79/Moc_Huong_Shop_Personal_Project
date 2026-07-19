@@ -16,4 +16,6 @@ public interface ProductService {
     void deleteProduct(Long productId);
     Object updateProduct(Long productId, ProductUpdateRequest request, List<MultipartFile> newImages);
     Page<Object> getInactiveProducts(Pageable pageable); // Lấy danh sách thùng rác
+    void restoreProduct(Long productId);
+    void hardDeleteProduct(Long productId);
 }

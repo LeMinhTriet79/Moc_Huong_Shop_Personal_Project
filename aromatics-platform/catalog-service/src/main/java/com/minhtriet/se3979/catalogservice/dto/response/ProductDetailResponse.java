@@ -19,6 +19,7 @@ public class ProductDetailResponse {
     private BigDecimal averageRating;
     private Integer totalReviews;
     private Integer totalSold;
+    private Boolean isActive;
 
     // Chứa danh sách toàn bộ ảnh
     private List<ImageDto> images;

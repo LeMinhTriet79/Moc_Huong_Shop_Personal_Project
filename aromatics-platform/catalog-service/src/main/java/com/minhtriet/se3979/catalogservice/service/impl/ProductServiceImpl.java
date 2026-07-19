@@ -81,6 +81,7 @@ public class ProductServiceImpl implements ProductService {
                 .totalSold(product.getTotalSold())
                 .images(imageDtos)
                 .variants(variantDtos)
+                .isActive(product.getIsActive()) // <--- ĐÃ THÊM CỜ BÁO HIỆU
                 .build();
     }
 
@@ -264,7 +265,58 @@ public class ProductServiceImpl implements ProductService {
                 .totalSold(p.getTotalSold())
                 .primaryImageUrl(primaryImage)
                 .startingPrice(startPrice)
+                .isActive(p.getIsActive()) // <--- ĐÃ THÊM CỜ BÁO HIỆU
                 .build();
+    }
+
+    // KHÔI PHỤC SẢN PHẨM TỪ THÙNG RÁC
+    @Transactional
+    @Override
+    public void restoreProduct(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm!"));
+
+        if (product.getIsActive()) {
+            throw new RuntimeException("Sản phẩm này vẫn đang hoạt động, không cần khôi phục!");
+        }
+
+        product.setIsActive(true);
+        productRepository.save(product);
+    }
+
+    // XÓA VĨNH VIỄN (Chỉ được xóa khi sản phẩm đang nằm trong thùng rác)
+    @Transactional
+    @Override
+    public void hardDeleteProduct(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm!"));
+
+        if (product.getIsActive()) {
+            throw new RuntimeException("Phải đưa sản phẩm vào thùng rác trước khi xóa vĩnh viễn!");
+        }
+
+        // 1. Dọn rác Cloudinary
+        if (product.getImages() != null && !product.getImages().isEmpty()) {
+            for (ProductImage img : product.getImages()) {
+                try {
+                    if (img.getCloudinaryPublicId() != null) {
+                        cloudinaryService.deleteImage(img.getCloudinaryPublicId());
+                    }
+                } catch (Exception e) {
+                    System.err.println("Lỗi dọn rác Cloudinary: " + e.getMessage());
+                }
+            }
+        }
+
+        // 2. Xóa Tồn kho trước để tránh lỗi khóa ngoại
+        if (product.getVariants() != null && !product.getVariants().isEmpty()) {
+            for (ProductVariant variant : product.getVariants()) {
+                inventoryRepository.deleteByVariantId(variant.getId());
+            }
+        }
+
+        // 3. Thiêu rụi dưới Database
+        productRepository.delete(product);
     }
 
     private String generateSlug(String input) {

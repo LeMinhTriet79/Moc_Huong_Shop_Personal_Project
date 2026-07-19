@@ -93,4 +93,20 @@ public class ProductController {
         productService.deleteProduct(id);
         return ResponseEntity.ok("Đã đưa sản phẩm vào thùng rác thành công!");
     }
+
+    // API: Khôi phục sản phẩm từ thùng rác
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+    @PutMapping("/{id}/restore")
+    public ResponseEntity<?> restoreProduct(@PathVariable Long id) {
+        productService.restoreProduct(id);
+        return ResponseEntity.ok("Đã khôi phục sản phẩm thành công!");
+    }
+
+    // API: Xóa vĩnh viễn sản phẩm (Đổ rác)
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+    @DeleteMapping("/{id}/force")
+    public ResponseEntity<?> hardDeleteProduct(@PathVariable Long id) {
+        productService.hardDeleteProduct(id);
+        return ResponseEntity.ok("Đã xóa vĩnh viễn sản phẩm và dọn sạch ảnh trên mây!");
+    }
 }
