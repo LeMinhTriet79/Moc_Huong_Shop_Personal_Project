@@ -17,5 +17,6 @@ public class ReviewResponse {
     private String content;
     private List<String> images;  // Danh sách link ảnh Cloudinary
     private String adminReply;    // Câu trả lời của Shop (nếu có)
+    private Boolean isVisible;
     private LocalDateTime createdAt;
 }
