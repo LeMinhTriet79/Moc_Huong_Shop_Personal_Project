@@ -88,60 +88,86 @@ public class ProductServiceImpl implements ProductService {
     @Transactional
     @Override
     public Object createProductWithImages(ProductCreateRequest request, List<MultipartFile> files) {
+        // 1. FAIL FAST (CHẾT TỪ VÒNG GỬI XE): Kiểm tra trùng SKU trước khi làm bất cứ việc gì
+        if (productVariantRepository.existsBySku(request.getSku())) {
+            throw new RuntimeException("Mã SKU '" + request.getSku() + "' đã tồn tại. Vui lòng chọn mã khác!");
+        }
+
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy danh mục!"));
 
         String slug = generateSlug(request.getName()) + "-" + System.currentTimeMillis();
 
-        Product product = Product.builder()
-                .category(category)
-                .name(request.getName())
-                .slug(slug)
-                .shortDescription(request.getShortDescription())
-                .description(request.getDescription())
-                .brand(request.getBrand())
-                .tags(request.getTags())
-                .isPublished(true)
-                .isActive(true)
-                .build();
-        Product savedProduct = productRepository.save(product);
+        // 2. TẠO GIỎ RÁC TẠM THỜI: Lưu ID ảnh vừa up, lỡ DB lỗi thì lên mây xóa ngay
+        List<String> uploadedCloudinaryIds = new ArrayList<>();
 
-        if (files != null && !files.isEmpty()) {
-            List<ProductImage> productImages = new ArrayList<>();
-            for (int i = 0; i < files.size(); i++) {
-                try {
+        try {
+            Product product = Product.builder()
+                    .category(category)
+                    .name(request.getName())
+                    .slug(slug)
+                    .shortDescription(request.getShortDescription())
+                    .description(request.getDescription())
+                    .brand(request.getBrand())
+                    .tags(request.getTags())
+                    .isPublished(true)
+                    .isActive(true)
+                    .build();
+            Product savedProduct = productRepository.save(product);
+
+            if (files != null && !files.isEmpty()) {
+                List<ProductImage> productImages = new ArrayList<>();
+                for (int i = 0; i < files.size(); i++) {
                     Map<String, Object> uploadResult = cloudinaryService.uploadImage(files.get(i));
+                    String publicId = uploadResult.get("public_id").toString();
+
+                    // Thảy public_id vào giỏ rác tạm
+                    uploadedCloudinaryIds.add(publicId);
+
                     ProductImage image = ProductImage.builder()
                             .product(savedProduct)
-                            .cloudinaryPublicId(uploadResult.get("public_id").toString())
+                            .cloudinaryPublicId(publicId)
                             .imageUrl(uploadResult.get("secure_url").toString())
                             .isPrimary(i == 0)
                             .sortOrder(i)
                             .build();
                     productImages.add(image);
-                } catch (Exception e) {
-                    throw new RuntimeException("Lỗi upload ảnh", e);
+                }
+                productImageRepository.saveAll(productImages);
+            }
+
+            ProductVariant variant = ProductVariant.builder()
+                    .product(savedProduct)
+                    .sku(request.getSku())
+                    .variantName("Default")
+                    .price(request.getPrice())
+                    .isActive(true)
+                    .build();
+            ProductVariant savedVariant = productVariantRepository.save(variant);
+
+            Inventory inventory = Inventory.builder()
+                    .variant(savedVariant)
+                    .quantity(request.getStockQuantity())
+                    .build();
+            inventoryRepository.save(inventory);
+
+            return "Thêm sản phẩm, gắn ảnh và tạo kho thành công!";
+
+        } catch (Exception e) {
+            // 3. DỌN DẸP TÀN CUỘC (COMPENSATING TRANSACTION): Nếu đoạn code trên bị lỗi, tự động leo lên mây xóa rác
+            if (!uploadedCloudinaryIds.isEmpty()) {
+                for (String publicId : uploadedCloudinaryIds) {
+                    try {
+                        cloudinaryService.deleteImage(publicId);
+                        System.out.println("Đã tự động dọn rác Cloudinary do quá trình lưu DB thất bại: " + publicId);
+                    } catch (Exception ex) {
+                        System.err.println("Lỗi dọn rác Cloudinary: " + ex.getMessage());
+                    }
                 }
             }
-            productImageRepository.saveAll(productImages);
+            // Báo lỗi ra ngoài cho Frontend biết
+            throw new RuntimeException("Lỗi khi tạo sản phẩm: " + e.getMessage());
         }
-
-        ProductVariant variant = ProductVariant.builder()
-                .product(savedProduct)
-                .sku(request.getSku())
-                .variantName("Default")
-                .price(request.getPrice())
-                .isActive(true)
-                .build();
-        ProductVariant savedVariant = productVariantRepository.save(variant);
-
-        Inventory inventory = Inventory.builder()
-                .variant(savedVariant)
-                .quantity(request.getStockQuantity())
-                .build();
-        inventoryRepository.save(inventory);
-
-        return "Thêm sản phẩm, gắn ảnh và tạo kho thành công!";
     }
 
     // XÓA MỀM (SOFT DELETE) - Rất sạch sẽ và an toàn
@@ -301,6 +327,8 @@ public class ProductServiceImpl implements ProductService {
                 try {
                     if (img.getCloudinaryPublicId() != null) {
                         cloudinaryService.deleteImage(img.getCloudinaryPublicId());
+                        System.out.println("Đã leo lên mây xóa ảnh!");
+                        System.err.println("Đã leo lên mây xóa ảnh! AHIHI");
                     }
                 } catch (Exception e) {
                     System.err.println("Lỗi dọn rác Cloudinary: " + e.getMessage());
