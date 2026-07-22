@@ -3,8 +3,6 @@ package com.minhtriet.se3979.catalogservice.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,7 +28,6 @@ public class Review {
     @JoinColumn(name = "variant_id", nullable = false)
     private ProductVariant variant;
 
-    // ID tham chiếu chéo (không có Khóa ngoại vật lý)
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
@@ -46,9 +43,9 @@ public class Review {
     @Column(columnDefinition = "TEXT")
     private String content;
 
-    // Cột lưu mảng URL ảnh đánh giá
-    @JdbcTypeCode(SqlTypes.JSON)
-    private List<String> images;
+    // ĐÃ SỬA: Dùng Entity riêng thay vì JSON để quản lý được ID Cloudinary
+    @OneToMany(mappedBy = "review", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ReviewImage> images;
 
     @Column(name = "admin_reply", columnDefinition = "TEXT")
     private String adminReply;
