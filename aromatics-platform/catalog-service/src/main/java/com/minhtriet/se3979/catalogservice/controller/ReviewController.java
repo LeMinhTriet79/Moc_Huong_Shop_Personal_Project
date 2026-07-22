@@ -98,4 +98,16 @@ public class ReviewController {
         reviewService.toggleReviewVisibility(reviewId);
         return ResponseEntity.ok("Đã thay đổi trạng thái hiển thị của đánh giá!");
     }
+
+    /**
+     * API CHO ADMIN: Lấy tất cả đánh giá (Bao gồm cả bị ẩn)
+     */
+    @GetMapping("/{productId}/admin/reviews")
+    public ResponseEntity<Page<ReviewResponse>> getAdminProductReviews(
+            @PathVariable Long productId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        return ResponseEntity.ok(reviewService.getAdminProductReviews(productId, PageRequest.of(page, size)));
+    }
 }
