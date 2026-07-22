@@ -56,4 +56,46 @@ public class ReviewController {
 
         return ResponseEntity.ok(reviewService.getProductReviews(productId, PageRequest.of(page, size)));
     }
+
+    // ==========================================
+    // API CẬP NHẬT & XÓA BỞI KHÁCH HÀNG
+    // ==========================================
+
+    @PutMapping("/{productId}/reviews/{reviewId}")
+    public ResponseEntity<?> updateReview(
+            @PathVariable Long productId,
+            @PathVariable Long reviewId,
+            @RequestHeader(value = "X-UserId", defaultValue = "1") Long userId,
+            @RequestParam Integer rating,
+            @RequestParam String content) {
+        return ResponseEntity.ok(reviewService.updateReview(reviewId, userId, rating, content));
+    }
+
+    @DeleteMapping("/{productId}/reviews/{reviewId}")
+    public ResponseEntity<?> deleteReview(
+            @PathVariable Long productId,
+            @PathVariable Long reviewId,
+            @RequestHeader(value = "X-UserId", defaultValue = "1") Long userId) {
+        reviewService.deleteReview(reviewId, userId);
+        return ResponseEntity.ok("Đã xóa đánh giá thành công!");
+    }
+
+    // ==========================================
+    // API QUẢN LÝ BỞI ADMIN
+    // ==========================================
+
+    @PutMapping("/reviews/{reviewId}/reply")
+    public ResponseEntity<?> adminReply(
+            @PathVariable Long reviewId,
+            @RequestParam String replyContent) {
+        // Trong thực tế sẽ gắn @PreAuthorize("hasRole('ADMIN')") ở đây
+        return ResponseEntity.ok(reviewService.adminReplyReview(reviewId, replyContent));
+    }
+
+    @PutMapping("/reviews/{reviewId}/toggle-visibility")
+    public ResponseEntity<?> toggleVisibility(@PathVariable Long reviewId) {
+        // Trong thực tế sẽ gắn @PreAuthorize("hasRole('ADMIN')") ở đây
+        reviewService.toggleReviewVisibility(reviewId);
+        return ResponseEntity.ok("Đã thay đổi trạng thái hiển thị của đánh giá!");
+    }
 }
