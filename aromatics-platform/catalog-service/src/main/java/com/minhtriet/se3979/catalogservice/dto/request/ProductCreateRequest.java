@@ -1,6 +1,7 @@
 package com.minhtriet.se3979.catalogservice.dto.request;
 
 import lombok.Data;
+import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -11,5 +12,9 @@ public class ProductCreateRequest {
     private String description;
     private String brand;
     private List<String> tags;
-    // Tạm thời làm sản phẩm đơn giản, Variant tính sau nhé!
+
+    // BỔ SUNG 3 TRƯỜNG NÀY ĐỂ TẠO VARIANT VÀ TỒN KHO MẶC ĐỊNH
+    private String sku;
+    private BigDecimal price;
+    private Integer stockQuantity;
 }

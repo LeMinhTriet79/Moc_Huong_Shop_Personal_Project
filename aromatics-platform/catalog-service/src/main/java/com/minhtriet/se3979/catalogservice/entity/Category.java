@@ -35,6 +35,9 @@ public class Category {
     @Column(name = "image_url", length = 500)
     private String imageUrl;
 
+    @Column(name = "cloudinary_public_id")
+    private String cloudinaryPublicId;
+
     @Column(columnDefinition = "TEXT")
     private String description;
 
