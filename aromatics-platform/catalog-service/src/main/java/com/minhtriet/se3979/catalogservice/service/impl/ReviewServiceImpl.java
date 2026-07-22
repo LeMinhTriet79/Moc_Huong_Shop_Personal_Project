@@ -133,4 +133,84 @@ public class ReviewServiceImpl implements ReviewService {
                     .build();
         });
     }
+
+    // ==========================================
+    // CÁC HÀM CRUD BỔ SUNG CHO ĐÁNH GIÁ
+    // ==========================================
+
+    @Transactional
+    @Override
+    public Object updateReview(Long reviewId, Long userId, Integer rating, String content) {
+        Review review = reviewRepository.findByIdAndUserId(reviewId, userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đánh giá hoặc bạn không có quyền sửa!"));
+
+        review.setRating(rating);
+        review.setContent(content);
+        reviewRepository.saveAndFlush(review);
+
+        // Tính lại điểm số
+        recalculateProductRating(review.getProduct());
+        return "Cập nhật đánh giá thành công!";
+    }
+
+    @Transactional
+    @Override
+    public void deleteReview(Long reviewId, Long userId) {
+        Review review = reviewRepository.findByIdAndUserId(reviewId, userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đánh giá hoặc bạn không có quyền xóa!"));
+
+        Product product = review.getProduct();
+
+        // 1. Lên mây Cloudinary dọn rác ảnh
+        if (review.getImages() != null && !review.getImages().isEmpty()) {
+            for (ReviewImage img : review.getImages()) {
+                try {
+                    cloudinaryService.deleteImage(img.getCloudinaryPublicId());
+                } catch (Exception e) {
+                    System.err.println("Lỗi dọn rác ảnh review: " + e.getMessage());
+                }
+            }
+        }
+
+        // 2. Xóa dưới DB
+        reviewRepository.delete(review);
+        reviewRepository.flush(); // Ép xóa ngay lập tức để tính lại điểm
+
+        // 3. Tính lại điểm số của Sản phẩm
+        recalculateProductRating(product);
+    }
+
+    @Transactional
+    @Override
+    public Object adminReplyReview(Long reviewId, String replyContent) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đánh giá!"));
+
+        review.setAdminReply(replyContent);
+        review.setAdminRepliedAt(java.time.LocalDateTime.now());
+        reviewRepository.save(review);
+        return "Đã trả lời bình luận của khách hàng!";
+    }
+
+    @Transactional
+    @Override
+    public void toggleReviewVisibility(Long reviewId) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đánh giá!"));
+
+        // Đảo ngược trạng thái Ẩn/Hiện
+        review.setIsVisible(!review.getIsVisible());
+        reviewRepository.saveAndFlush(review);
+
+        // Ẩn đi thì điểm số Sản phẩm cũng phải tính lại, không được tính bình luận đã bị ẩn
+        recalculateProductRating(review.getProduct());
+    }
+
+    // --- Hàm Helper dùng chung để tính toán lại điểm số ---
+    private void recalculateProductRating(Product product) {
+        ReviewRepository.ReviewStats stats = reviewRepository.getReviewStats(product.getId());
+        product.setTotalReviews(stats.getTotalReviews());
+        product.setAverageRating(BigDecimal.valueOf(stats.getAverageRating()));
+        productRepository.save(product);
+    }
 }
