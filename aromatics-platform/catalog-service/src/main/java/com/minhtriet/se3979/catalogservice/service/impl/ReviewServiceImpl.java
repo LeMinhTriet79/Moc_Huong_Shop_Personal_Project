@@ -109,31 +109,43 @@ public class ReviewServiceImpl implements ReviewService {
         }
     }
 
+    // ==========================================
+    // API LẤY DANH SÁCH CHO KHÁCH HÀNG (CHỈ THẤY BÀI HIỂN THỊ)
+    // ==========================================
     @Override
     public Page<ReviewResponse> getProductReviews(Long productId, Pageable pageable) {
-        // Kéo danh sách Review từ DB (Chỉ lấy bài viết được phép hiển thị)
         Page<Review> reviews = reviewRepository.findByProductIdAndIsVisibleTrue(productId, pageable);
-
-        // Chuyển đổi (Map) Entity sang DTO để trả về Frontend
-        return reviews.map(review -> {
-            List<String> imageUrls = review.getImages() != null ?
-                    review.getImages().stream().map(ReviewImage::getImageUrl).toList() :
-                    new ArrayList<>();
-
-            return ReviewResponse.builder()
-                    .id(review.getId())
-                    .userId(review.getUserId())
-                    .variantName(review.getVariant().getVariantName())
-                    .rating(review.getRating())
-                    .title(review.getTitle())
-                    .content(review.getContent())
-                    .images(imageUrls) // Chỉ trả về URL, không trả CloudinaryID ra ngoài
-                    .adminReply(review.getAdminReply())
-                    .createdAt(review.getCreatedAt())
-                    .build();
-        });
+        return reviews.map(this::mapToReviewResponse);
     }
 
+    // ==========================================
+    // API LẤY DANH SÁCH CHO ADMIN (THẤY TẤT CẢ)
+    // ==========================================
+    @Override
+    public Page<ReviewResponse> getAdminProductReviews(Long productId, Pageable pageable) {
+        Page<Review> reviews = reviewRepository.findByProductId(productId, pageable);
+        return reviews.map(this::mapToReviewResponse);
+    }
+
+    // Hàm Helper: Map từ Entity sang DTO (Tránh lặp code)
+    private ReviewResponse mapToReviewResponse(Review review) {
+        List<String> imageUrls = review.getImages() != null ?
+                review.getImages().stream().map(ReviewImage::getImageUrl).toList() :
+                new ArrayList<>();
+
+        return ReviewResponse.builder()
+                .id(review.getId())
+                .userId(review.getUserId())
+                .variantName(review.getVariant().getVariantName())
+                .rating(review.getRating())
+                .title(review.getTitle())
+                .content(review.getContent())
+                .images(imageUrls)
+                .adminReply(review.getAdminReply())
+                .isVisible(review.getIsVisible()) // Đã bổ sung cờ trạng thái
+                .createdAt(review.getCreatedAt())
+                .build();
+    }
     // ==========================================
     // CÁC HÀM CRUD BỔ SUNG CHO ĐÁNH GIÁ
     // ==========================================

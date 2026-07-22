@@ -27,4 +27,7 @@ public interface ReviewService {
 
     // 4. Admin: Ẩn/Hiện đánh giá (Kiểm duyệt)
     void toggleReviewVisibility(Long reviewId);
+
+    // Lấy danh sách đánh giá cho Admin (Thấy cả bài bị ẩn)
+    Page<ReviewResponse> getAdminProductReviews(Long productId, Pageable pageable);
 }
