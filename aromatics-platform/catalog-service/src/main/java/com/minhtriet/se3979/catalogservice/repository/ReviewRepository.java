@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public interface ReviewRepository extends JpaRepository<Review, Long> {
 
@@ -29,4 +31,6 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             "FROM Review r WHERE r.product.id = :productId AND r.isVisible = true")
     ReviewStats getReviewStats(@Param("productId") Long productId);
 
+    // Thêm hàm này vào để bảo mật: Tìm review theo ID của review và ID của user
+    Optional<Review> findByIdAndUserId(Long id, Long userId);
 }
