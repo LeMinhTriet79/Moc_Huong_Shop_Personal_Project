@@ -33,4 +33,5 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     // Thêm hàm này vào để bảo mật: Tìm review theo ID của review và ID của user
     Optional<Review> findByIdAndUserId(Long id, Long userId);
+    Page<Review> findByProductId(Long productId, Pageable pageable);
 }
