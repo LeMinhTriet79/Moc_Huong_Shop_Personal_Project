@@ -553,7 +553,7 @@ erDiagram
 
     INVENTORIES {
         UUID id PK
-        UUID variant_id FK UK
+        UUID variant_id FK, UK
         INTEGER quantity
         INTEGER reserved_quantity
         TIMESTAMP created_at
