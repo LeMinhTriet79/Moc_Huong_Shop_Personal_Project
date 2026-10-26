@@ -2,26 +2,31 @@ package com.minhtriet.se3979.catalogservice.service.impl;
 
 import com.minhtriet.se3979.catalogservice.dto.request.ProductCreateRequest;
 import com.minhtriet.se3979.catalogservice.dto.request.ProductUpdateRequest;
+import com.minhtriet.se3979.catalogservice.dto.request.VariantCreateRequest;
 import com.minhtriet.se3979.catalogservice.dto.response.ProductDetailResponse;
 import com.minhtriet.se3979.catalogservice.dto.response.ProductResponse;
 import com.minhtriet.se3979.catalogservice.entity.*;
+import com.minhtriet.se3979.catalogservice.exception.AppException;
 import com.minhtriet.se3979.catalogservice.repository.*;
 import com.minhtriet.se3979.catalogservice.service.CloudinaryService;
+import com.minhtriet.se3979.catalogservice.service.ProductCacheService;
 import com.minhtriet.se3979.catalogservice.service.ProductService;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.text.Normalizer;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Pattern;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProductServiceImpl implements ProductService {
@@ -32,73 +37,74 @@ public class ProductServiceImpl implements ProductService {
     private final CloudinaryService cloudinaryService;
     private final ProductVariantRepository productVariantRepository;
     private final InventoryRepository inventoryRepository;
+    private final ProductCacheService productCacheService;
 
     @Override
-    public Page<Object> searchProducts(String keyword, Long categoryId, BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable) {
-        Page<Product> products = productRepository.searchProducts(keyword, categoryId, minPrice, maxPrice, pageable);
-        return products.map(this::mapToResponse).map(dto -> (Object) dto);
+    public Page<ProductResponse> searchProducts(String keyword, Long categoryId, String brand, BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable) {
+        Page<Product> products = productRepository.searchProducts(keyword, categoryId, brand, minPrice, maxPrice, pageable);
+        return products.map(this::mapToResponse);
     }
 
     @Override
-    public Object getProductDetail(String slug) {
+    public List<ProductResponse> getFeaturedProducts() {
+        Optional<List<ProductResponse>> cached = productCacheService.getFeaturedProducts();
+        if (cached.isPresent()) {
+            return cached.get();
+        }
+
+        List<Product> topProducts = productRepository.findTopFeatured(PageRequest.of(0, 10));
+        List<ProductResponse> response = topProducts.stream()
+                .map(this::mapToResponse)
+                .toList();
+
+        productCacheService.cacheFeaturedProducts(response);
+        return response;
+    }
+
+    @Override
+    public ProductDetailResponse getProductDetail(String slug) {
+        Optional<ProductDetailResponse> cached = productCacheService.getProductDetailBySlug(slug);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
+
         Product product = productRepository.findBySlug(slug)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với slug: " + slug));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy sản phẩm với slug: " + slug));
 
-        List<ProductDetailResponse.ImageDto> imageDtos = product.getImages().stream()
-                .map(img -> ProductDetailResponse.ImageDto.builder()
-                        .id(img.getId())
-                        .imageUrl(img.getImageUrl())
-                        .isPrimary(img.getIsPrimary())
-                        .build())
-                .toList();
-
-        List<ProductDetailResponse.VariantDto> variantDtos = product.getVariants().stream()
-                .map(var -> {
-                    Integer stock = inventoryRepository.findByVariantId(var.getId())
-                            .map(Inventory::getQuantity)
-                            .orElse(0);
-
-                    return ProductDetailResponse.VariantDto.builder()
-                            .id(var.getId())
-                            .sku(var.getSku())
-                            .variantName(var.getVariantName())
-                            .price(var.getPrice())
-                            .stockQuantity(stock)
-                            .build();
-                })
-                .toList();
-
-        return ProductDetailResponse.builder()
-                .id(product.getId())
-                .name(product.getName())
-                .slug(product.getSlug())
-                .shortDescription(product.getShortDescription())
-                .description(product.getDescription())
-                .brand(product.getBrand())
-                .tags(product.getTags())
-                .averageRating(product.getAverageRating())
-                .totalReviews(product.getTotalReviews())
-                .totalSold(product.getTotalSold())
-                .images(imageDtos)
-                .variants(variantDtos)
-                .isActive(product.getIsActive()) // <--- ĐÃ THÊM CỜ BÁO HIỆU
-                .build();
+        ProductDetailResponse detail = mapToDetailResponse(product);
+        productCacheService.cacheProductDetail(slug, detail);
+        return detail;
     }
 
     @Transactional
     @Override
-    public Object createProductWithImages(ProductCreateRequest request, List<MultipartFile> files) {
-        // 1. FAIL FAST (CHẾT TỪ VÒNG GỬI XE): Kiểm tra trùng SKU trước khi làm bất cứ việc gì
-        if (productVariantRepository.existsBySku(request.getSku())) {
-            throw new RuntimeException("Mã SKU '" + request.getSku() + "' đã tồn tại. Vui lòng chọn mã khác!");
+    public ProductDetailResponse createProductWithImages(ProductCreateRequest request, List<MultipartFile> files) {
+        // 1. Kiểm tra SKU (Fail Fast)
+        boolean hasMultiVariants = request.getVariants() != null && !request.getVariants().isEmpty();
+        if (hasMultiVariants) {
+            Set<String> skuSet = new HashSet<>();
+            for (VariantCreateRequest vReq : request.getVariants()) {
+                if (!skuSet.add(vReq.getSku())) {
+                    throw new AppException(HttpStatus.BAD_REQUEST, "Danh sách biến thể có mã SKU trùng nhau: " + vReq.getSku());
+                }
+                if (productVariantRepository.existsBySku(vReq.getSku())) {
+                    throw new AppException(HttpStatus.BAD_REQUEST, "Mã SKU '" + vReq.getSku() + "' đã tồn tại!");
+                }
+            }
+        } else {
+            if (request.getSku() == null || request.getSku().isBlank()) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng nhập mã SKU hoặc danh sách biến thể!");
+            }
+            if (productVariantRepository.existsBySku(request.getSku())) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Mã SKU '" + request.getSku() + "' đã tồn tại!");
+            }
         }
 
         Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy danh mục!"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy danh mục!"));
 
         String slug = generateSlug(request.getName()) + "-" + System.currentTimeMillis();
 
-        // 2. TẠO GIỎ RÁC TẠM THỜI: Lưu ID ảnh vừa up, lỡ DB lỗi thì lên mây xóa ngay
         List<String> uploadedCloudinaryIds = new ArrayList<>();
 
         try {
@@ -115,13 +121,13 @@ public class ProductServiceImpl implements ProductService {
                     .build();
             Product savedProduct = productRepository.save(product);
 
+            // Upload ảnh lên Cloudinary
             if (files != null && !files.isEmpty()) {
                 List<ProductImage> productImages = new ArrayList<>();
                 for (int i = 0; i < files.size(); i++) {
+                    if (files.get(i).isEmpty()) continue;
                     Map<String, Object> uploadResult = cloudinaryService.uploadImage(files.get(i));
                     String publicId = uploadResult.get("public_id").toString();
-
-                    // Thảy public_id vào giỏ rác tạm
                     uploadedCloudinaryIds.add(publicId);
 
                     ProductImage image = ProductImage.builder()
@@ -134,71 +140,97 @@ public class ProductServiceImpl implements ProductService {
                     productImages.add(image);
                 }
                 productImageRepository.saveAll(productImages);
+                savedProduct.setImages(productImages);
             }
 
-            ProductVariant variant = ProductVariant.builder()
-                    .product(savedProduct)
-                    .sku(request.getSku())
-                    .variantName("Default")
-                    .price(request.getPrice())
-                    .isActive(true)
-                    .build();
-            ProductVariant savedVariant = productVariantRepository.save(variant);
+            // Tạo các biến thể & tồn kho
+            List<ProductVariant> savedVariants = new ArrayList<>();
+            if (hasMultiVariants) {
+                int sortOrder = 0;
+                for (VariantCreateRequest vReq : request.getVariants()) {
+                    ProductVariant variant = ProductVariant.builder()
+                            .product(savedProduct)
+                            .sku(vReq.getSku())
+                            .variantName(vReq.getVariantName())
+                            .price(vReq.getPrice())
+                            .originalPrice(vReq.getOriginalPrice())
+                            .weightGram(vReq.getWeightGram())
+                            .attributes(vReq.getAttributes())
+                            .isActive(true)
+                            .sortOrder(sortOrder++)
+                            .build();
+                    ProductVariant savedVar = productVariantRepository.save(variant);
 
-            Inventory inventory = Inventory.builder()
-                    .variant(savedVariant)
-                    .quantity(request.getStockQuantity())
-                    .build();
-            inventoryRepository.save(inventory);
+                    Inventory inventory = Inventory.builder()
+                            .variant(savedVar)
+                            .quantity(vReq.getInitialStock() != null ? vReq.getInitialStock() : 0)
+                            .reservedQuantity(0)
+                            .lowStockThreshold(vReq.getLowStockThreshold() != null ? vReq.getLowStockThreshold() : 10)
+                            .build();
+                    inventoryRepository.save(inventory);
+                    savedVar.setInventory(inventory);
+                    savedVariants.add(savedVar);
+                }
+            } else {
+                ProductVariant variant = ProductVariant.builder()
+                        .product(savedProduct)
+                        .sku(request.getSku())
+                        .variantName("Default")
+                        .price(request.getPrice() != null ? request.getPrice() : BigDecimal.ZERO)
+                        .isActive(true)
+                        .sortOrder(0)
+                        .build();
+                ProductVariant savedVar = productVariantRepository.save(variant);
 
-            return "Thêm sản phẩm, gắn ảnh và tạo kho thành công!";
+                Inventory inventory = Inventory.builder()
+                        .variant(savedVar)
+                        .quantity(request.getStockQuantity() != null ? request.getStockQuantity() : 0)
+                        .reservedQuantity(0)
+                        .lowStockThreshold(10)
+                        .build();
+                inventoryRepository.save(inventory);
+                savedVar.setInventory(inventory);
+                savedVariants.add(savedVar);
+            }
+            savedProduct.setVariants(savedVariants);
+
+            // Xóa cache danh sách sản phẩm nổi bật
+            productCacheService.evictProduct(slug);
+
+            return mapToDetailResponse(savedProduct);
 
         } catch (Exception e) {
-            // 3. DỌN DẸP TÀN CUỘC (COMPENSATING TRANSACTION): Nếu đoạn code trên bị lỗi, tự động leo lên mây xóa rác
+            // Compensating Transaction
             if (!uploadedCloudinaryIds.isEmpty()) {
                 for (String publicId : uploadedCloudinaryIds) {
                     try {
                         cloudinaryService.deleteImage(publicId);
-                        System.out.println("Đã tự động dọn rác Cloudinary do quá trình lưu DB thất bại: " + publicId);
                     } catch (Exception ex) {
-                        System.err.println("Lỗi dọn rác Cloudinary: " + ex.getMessage());
+                        log.error("Lỗi dọn rác Cloudinary: {}", ex.getMessage());
                     }
                 }
             }
-            // Báo lỗi ra ngoài cho Frontend biết
-            throw new RuntimeException("Lỗi khi tạo sản phẩm: " + e.getMessage());
+            if (e instanceof AppException) throw (AppException) e;
+            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "Lỗi khi tạo sản phẩm: " + e.getMessage());
         }
-    }
-
-    // XÓA MỀM (SOFT DELETE) - Rất sạch sẽ và an toàn
-    @Transactional
-    @Override
-    public void deleteProduct(Long productId) {
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm cần xóa!"));
-
-        if (!product.getIsActive()) {
-            throw new RuntimeException("Sản phẩm này đã bị xóa (ẩn) từ trước rồi!");
-        }
-
-        product.setIsActive(false);
-        productRepository.save(product);
     }
 
     @Transactional
     @Override
-    public Object updateProduct(Long productId, ProductUpdateRequest request, List<MultipartFile> newImages) {
+    public ProductDetailResponse updateProduct(Long productId, ProductUpdateRequest request, List<MultipartFile> newImages) {
         Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm!"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy sản phẩm id: " + productId));
+
+        String oldSlug = product.getSlug();
 
         if (request != null) {
-            if (request.getName() != null && !request.getName().isEmpty()) {
+            if (request.getName() != null && !request.getName().isBlank()) {
                 product.setName(request.getName());
                 product.setSlug(generateSlug(request.getName()) + "-" + System.currentTimeMillis());
             }
             if (request.getCategoryId() != null) {
                 Category category = categoryRepository.findById(request.getCategoryId())
-                        .orElseThrow(() -> new RuntimeException("Không tìm thấy danh mục!"));
+                        .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy danh mục!"));
                 product.setCategory(category);
             }
             if (request.getShortDescription() != null) product.setShortDescription(request.getShortDescription());
@@ -215,6 +247,7 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
+        // Xóa ảnh cũ
         if (request != null && request.getDeletedImageIds() != null && !request.getDeletedImageIds().isEmpty()) {
             List<ProductImage> imagesToDelete = product.getImages().stream()
                     .filter(img -> request.getDeletedImageIds().contains(img.getId()))
@@ -227,11 +260,12 @@ public class ProductServiceImpl implements ProductService {
                     }
                     product.getImages().remove(img);
                 } catch (Exception e) {
-                    System.err.println("Lỗi xóa ảnh cũ: " + e.getMessage());
+                    log.error("Lỗi xóa ảnh cũ trên Cloudinary: {}", e.getMessage());
                 }
             }
         }
 
+        // Thêm ảnh mới
         if (newImages != null && !newImages.isEmpty()) {
             int currentMaxSortOrder = product.getImages().stream()
                     .mapToInt(ProductImage::getSortOrder)
@@ -252,33 +286,112 @@ public class ProductServiceImpl implements ProductService {
                             .build();
                     product.getImages().add(newImage);
                 } catch (Exception e) {
-                    throw new RuntimeException("Lỗi upload ảnh mới lên mây!", e);
+                    throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "Lỗi upload ảnh mới lên mây: " + e.getMessage());
                 }
             }
         }
 
-        productRepository.save(product);
-        return "Cập nhật sản phẩm và thư viện ảnh thành công!";
+        Product saved = productRepository.save(product);
+
+        // Evict cache cả slug cũ và slug mới
+        productCacheService.evictProduct(oldSlug);
+        productCacheService.evictProduct(saved.getSlug());
+
+        return mapToDetailResponse(saved);
     }
 
-    // THÙNG RÁC
+    @Transactional
     @Override
-    public Page<Object> getInactiveProducts(Pageable pageable) {
-        Page<Product> products = productRepository.findByIsActiveFalse(pageable);
-        return products.map(this::mapToResponse).map(dto -> (Object) dto);
+    public void deleteProduct(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy sản phẩm cần xóa!"));
+
+        if (!product.getIsActive()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Sản phẩm này đã bị xóa (ẩn) từ trước rồi!");
+        }
+
+        product.setIsActive(false);
+        productRepository.save(product);
+
+        productCacheService.evictProduct(product.getSlug());
+    }
+
+    @Transactional
+    @Override
+    public void restoreProduct(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy sản phẩm!"));
+
+        if (product.getIsActive()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Sản phẩm này vẫn đang hoạt động, không cần khôi phục!");
+        }
+
+        product.setIsActive(true);
+        productRepository.save(product);
+
+        productCacheService.evictProduct(product.getSlug());
+    }
+
+    @Transactional
+    @Override
+    public void hardDeleteProduct(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy sản phẩm!"));
+
+        if (product.getIsActive()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Phải đưa sản phẩm vào thùng rác trước khi xóa vĩnh viễn!");
+        }
+
+        // Xóa ảnh Cloudinary
+        if (product.getImages() != null && !product.getImages().isEmpty()) {
+            for (ProductImage img : product.getImages()) {
+                try {
+                    if (img.getCloudinaryPublicId() != null) {
+                        cloudinaryService.deleteImage(img.getCloudinaryPublicId());
+                    }
+                } catch (Exception e) {
+                    log.error("Lỗi dọn rác Cloudinary: {}", e.getMessage());
+                }
+            }
+        }
+
+        // Xóa tồn kho
+        if (product.getVariants() != null && !product.getVariants().isEmpty()) {
+            for (ProductVariant variant : product.getVariants()) {
+                inventoryRepository.deleteByVariantId(variant.getId());
+            }
+        }
+
+        productRepository.delete(product);
+
+        productCacheService.evictProduct(product.getSlug());
+    }
+
+    @Override
+    public Page<ProductResponse> getInactiveProducts(Pageable pageable) {
+        return productRepository.findByIsActiveFalse(pageable).map(this::mapToResponse);
     }
 
     private ProductResponse mapToResponse(Product p) {
-        String primaryImage = p.getImages().stream()
-                .filter(ProductImage::getIsPrimary)
-                .map(ProductImage::getImageUrl)
-                .findFirst()
-                .orElse(null);
+        String primaryImage = null;
+        if (p.getImages() != null) {
+            primaryImage = p.getImages().stream()
+                    .filter(ProductImage::getIsPrimary)
+                    .map(ProductImage::getImageUrl)
+                    .findFirst()
+                    .orElse(null);
+            if (primaryImage == null && !p.getImages().isEmpty()) {
+                primaryImage = p.getImages().get(0).getImageUrl();
+            }
+        }
 
-        BigDecimal startPrice = p.getVariants().stream()
-                .map(ProductVariant::getPrice)
-                .min(BigDecimal::compareTo)
-                .orElse(BigDecimal.ZERO);
+        BigDecimal startPrice = BigDecimal.ZERO;
+        if (p.getVariants() != null && !p.getVariants().isEmpty()) {
+            startPrice = p.getVariants().stream()
+                    .map(ProductVariant::getPrice)
+                    .min(BigDecimal::compareTo)
+                    .orElse(BigDecimal.ZERO);
+        }
 
         return ProductResponse.builder()
                 .id(p.getId())
@@ -291,60 +404,70 @@ public class ProductServiceImpl implements ProductService {
                 .totalSold(p.getTotalSold())
                 .primaryImageUrl(primaryImage)
                 .startingPrice(startPrice)
-                .isActive(p.getIsActive()) // <--- ĐÃ THÊM CỜ BÁO HIỆU
+                .isActive(p.getIsActive())
                 .build();
     }
 
-    // KHÔI PHỤC SẢN PHẨM TỪ THÙNG RÁC
-    @Transactional
-    @Override
-    public void restoreProduct(Long productId) {
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm!"));
+    private ProductDetailResponse mapToDetailResponse(Product product) {
+        List<ProductDetailResponse.ImageDto> imageDtos = product.getImages() != null
+                ? product.getImages().stream()
+                .map(img -> ProductDetailResponse.ImageDto.builder()
+                        .id(img.getId())
+                        .imageUrl(img.getImageUrl())
+                        .isPrimary(img.getIsPrimary())
+                        .build())
+                .toList()
+                : List.of();
 
-        if (product.getIsActive()) {
-            throw new RuntimeException("Sản phẩm này vẫn đang hoạt động, không cần khôi phục!");
-        }
-
-        product.setIsActive(true);
-        productRepository.save(product);
-    }
-
-    // XÓA VĨNH VIỄN (Chỉ được xóa khi sản phẩm đang nằm trong thùng rác)
-    @Transactional
-    @Override
-    public void hardDeleteProduct(Long productId) {
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm!"));
-
-        if (product.getIsActive()) {
-            throw new RuntimeException("Phải đưa sản phẩm vào thùng rác trước khi xóa vĩnh viễn!");
-        }
-
-        // 1. Dọn rác Cloudinary
-        if (product.getImages() != null && !product.getImages().isEmpty()) {
-            for (ProductImage img : product.getImages()) {
-                try {
-                    if (img.getCloudinaryPublicId() != null) {
-                        cloudinaryService.deleteImage(img.getCloudinaryPublicId());
-                        System.out.println("Đã leo lên mây xóa ảnh!");
-                        System.err.println("Đã leo lên mây xóa ảnh! AHIHI");
+        List<ProductDetailResponse.VariantDto> variantDtos = product.getVariants() != null
+                ? product.getVariants().stream()
+                .map(var -> {
+                    Integer stock = 0;
+                    Integer reserved = 0;
+                    if (var.getInventory() != null) {
+                        stock = var.getInventory().getQuantity();
+                        reserved = var.getInventory().getReservedQuantity();
+                    } else {
+                        var invOpt = inventoryRepository.findByVariantId(var.getId());
+                        if (invOpt.isPresent()) {
+                            stock = invOpt.get().getQuantity();
+                            reserved = invOpt.get().getReservedQuantity();
+                        }
                     }
-                } catch (Exception e) {
-                    System.err.println("Lỗi dọn rác Cloudinary: " + e.getMessage());
-                }
-            }
-        }
+                    int available = Math.max(0, stock - reserved);
 
-        // 2. Xóa Tồn kho trước để tránh lỗi khóa ngoại
-        if (product.getVariants() != null && !product.getVariants().isEmpty()) {
-            for (ProductVariant variant : product.getVariants()) {
-                inventoryRepository.deleteByVariantId(variant.getId());
-            }
-        }
+                    return ProductDetailResponse.VariantDto.builder()
+                            .id(var.getId())
+                            .sku(var.getSku())
+                            .variantName(var.getVariantName())
+                            .price(var.getPrice())
+                            .originalPrice(var.getOriginalPrice())
+                            .weightGram(var.getWeightGram())
+                            .attributes(var.getAttributes())
+                            .isActive(var.getIsActive())
+                            .stockQuantity(stock)
+                            .reservedQuantity(reserved)
+                            .availableStock(available)
+                            .build();
+                })
+                .toList()
+                : List.of();
 
-        // 3. Thiêu rụi dưới Database
-        productRepository.delete(product);
+        return ProductDetailResponse.builder()
+                .id(product.getId())
+                .name(product.getName())
+                .slug(product.getSlug())
+                .shortDescription(product.getShortDescription())
+                .description(product.getDescription())
+                .brand(product.getBrand())
+                .tags(product.getTags())
+                .averageRating(product.getAverageRating())
+                .totalReviews(product.getTotalReviews())
+                .totalSold(product.getTotalSold())
+                .images(imageDtos)
+                .variants(variantDtos)
+                .isActive(product.getIsActive())
+                .build();
     }
 
     private String generateSlug(String input) {

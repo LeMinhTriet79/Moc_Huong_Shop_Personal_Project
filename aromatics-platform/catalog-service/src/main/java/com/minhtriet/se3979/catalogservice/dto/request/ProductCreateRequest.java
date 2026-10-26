@@ -13,7 +13,10 @@ public class ProductCreateRequest {
     private String brand;
     private List<String> tags;
 
-    // BỔ SUNG 3 TRƯỜNG NÀY ĐỂ TẠO VARIANT VÀ TỒN KHO MẶC ĐỊNH
+    // BỔ SUNG TRƯỜNG NÀY ĐỂ HỖ TRỢ ĐA BIẾN THỂ (MULTI-VARIANT)
+    private List<VariantCreateRequest> variants;
+
+    // 3 TRƯỜNG NÀY ĐỂ TẠO VARIANT VÀ TỒN KHO MẶC ĐỊNH (FALLBACK TƯƠNG THÍCH NGƯỢC)
     private String sku;
     private BigDecimal price;
     private Integer stockQuantity;

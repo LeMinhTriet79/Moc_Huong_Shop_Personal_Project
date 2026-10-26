@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
-
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
@@ -21,9 +20,27 @@ public class EmailService {
     private final JavaMailSender mailSender;
     private final TemplateEngine templateEngine;
 
+    // Gửi email HTML trực tiếp với tiêu đề và nội dung tùy biến
+    public void sendHtmlEmail(String toEmail, String subject, String htmlContent) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("📩 [Mộc Hương Shop] Đã gửi email thành công tới: {}", toEmail);
+        } catch (Exception e) {
+            log.error("❌ Lỗi khi gửi email tới {}: {}", toEmail, e.getMessage());
+            throw new RuntimeException("Lỗi gửi email: " + e.getMessage(), e);
+        }
+    }
+
+    // Gửi email hóa đơn qua Thymeleaf template
     public void sendInvoiceEmail(String toEmail, String orderCode, Double totalAmount) {
         try {
-            // 1. Tạo Context để truyền biến vào file HTML Thymeleaf
             Context context = new Context();
             context.setVariable("orderCode", orderCode);
             context.setVariable("totalAmount", totalAmount);
@@ -31,23 +48,11 @@ public class EmailService {
             SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
             context.setVariable("orderDate", sdf.format(new Date()));
 
-            // 2. Compile file "invoice-email.html" thành chuỗi HTML chuẩn
             String htmlContent = templateEngine.process("invoice-email", context);
-
-            // 3. Chuẩn bị email gửi đi
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-            helper.setTo(toEmail); // Người nhận
-            helper.setSubject("🎉 [Mộc Hương Shop] Xác nhận đơn hàng " + orderCode);
-            helper.setText(htmlContent, true); // true = Bật chế độ HTML
-
-            // 4. Bấm nút Gửi
-            mailSender.send(message);
-            log.info("📩 Đã gửi Email Hóa Đơn thành công đến hòm thư: {}", toEmail);
+            sendHtmlEmail(toEmail, "🎉 [Mộc Hương Shop] Xác nhận đơn hàng " + orderCode, htmlContent);
 
         } catch (Exception e) {
-            log.error("❌ Lỗi khi gửi Email: {}", e.getMessage());
+            log.error("❌ Lỗi khi gửi email hóa đơn: {}", e.getMessage());
         }
     }
 }
