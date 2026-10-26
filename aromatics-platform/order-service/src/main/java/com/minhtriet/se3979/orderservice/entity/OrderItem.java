@@ -51,4 +51,7 @@ public class OrderItem {
 
     @Column(nullable = false)
     private BigDecimal subtotal;
+
+    @Column(name = "review_id")
+    private Long reviewId;
 }

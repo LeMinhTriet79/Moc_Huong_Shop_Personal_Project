@@ -1,7 +1,9 @@
 package com.minhtriet.se3979.orderservice.vnpay;
 
+import com.minhtriet.se3979.orderservice.dto.response.ApiResponse;
 import com.minhtriet.se3979.orderservice.entity.Order;
 import com.minhtriet.se3979.orderservice.repository.OrderRepository;
+import com.minhtriet.se3979.orderservice.service.OrderService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
@@ -21,6 +24,7 @@ import java.util.*;
 public class PaymentController {
 
     private final OrderRepository orderRepository;
+    private final OrderService orderService;
 
     @Value("${vnpay.tmn-code}")
     private String vnp_TmnCode;
@@ -36,21 +40,23 @@ public class PaymentController {
 
     // 1. API Tạo Link Thanh Toán
     @GetMapping("/create-url/{orderId}")
-    public ResponseEntity<?> createPaymentUrl(@PathVariable Long orderId, HttpServletRequest request) {
+    public ResponseEntity<ApiResponse<Map<String, String>>> createPaymentUrl(
+            @PathVariable Long orderId, HttpServletRequest request) {
+
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
 
         String vnp_Version = "2.1.0";
         String vnp_Command = "pay";
-        // VNPay quy định số tiền phải nhân thêm 100
-        long amount = order.getTotalAmount().multiply(java.math.BigDecimal.valueOf(100)).longValue();
+        long amount = order.getTotalAmount().multiply(BigDecimal.valueOf(100)).longValue();
+
         Map<String, String> vnp_Params = new HashMap<>();
         vnp_Params.put("vnp_Version", vnp_Version);
         vnp_Params.put("vnp_Command", vnp_Command);
         vnp_Params.put("vnp_TmnCode", vnp_TmnCode);
         vnp_Params.put("vnp_Amount", String.valueOf(amount));
         vnp_Params.put("vnp_CurrCode", "VND");
-        vnp_Params.put("vnp_TxnRef", order.getOrderCode()); // Mã hóa đơn
+        vnp_Params.put("vnp_TxnRef", order.getOrderCode());
         vnp_Params.put("vnp_OrderInfo", "Thanh toan don hang " + order.getOrderCode());
         vnp_Params.put("vnp_OrderType", "other");
         vnp_Params.put("vnp_Locale", "vn");
@@ -67,7 +73,6 @@ public class PaymentController {
         String vnp_ExpireDate = formatter.format(cld.getTime());
         vnp_Params.put("vnp_ExpireDate", vnp_ExpireDate);
 
-        // Thuật toán tạo chữ ký (Hash)
         List<String> fieldNames = new ArrayList<>(vnp_Params.keySet());
         Collections.sort(fieldNames);
         StringBuilder hashData = new StringBuilder();
@@ -76,12 +81,11 @@ public class PaymentController {
         while (itr.hasNext()) {
             String fieldName = itr.next();
             String fieldValue = vnp_Params.get(fieldName);
-            if ((fieldValue != null) && (fieldValue.length() > 0)) {
-                // Build hash data
+            if ((fieldValue != null) && (!fieldValue.isEmpty())) {
                 hashData.append(fieldName);
                 hashData.append('=');
                 hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII));
-                // Build query
+
                 query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII));
                 query.append('=');
                 query.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII));
@@ -96,19 +100,22 @@ public class PaymentController {
         queryUrl += "&vnp_SecureHash=" + vnp_SecureHash;
         String paymentUrl = vnp_PayUrl + "?" + queryUrl;
 
-        // Trả về cái Link cho Frontend (React/Angular) chuyển hướng khách hàng
-        return ResponseEntity.ok(Map.of("paymentUrl", paymentUrl));
+        return ResponseEntity.ok(ApiResponse.success(
+                Map.of("paymentUrl", paymentUrl), "Tạo link thanh toán VNPay thành công"));
     }
 
     // 2. API Nhận Kết Quả Trả Về Từ VNPay
     @GetMapping("/vnpay-return")
-    public ResponseEntity<?> vnpayReturn(HttpServletRequest request) {
+    public ResponseEntity<ApiResponse<String>> vnpayReturn(HttpServletRequest request) {
         Map<String, String> fields = new HashMap<>();
+        Map<String, Object> rawResponse = new HashMap<>();
+
         for (Enumeration<String> params = request.getParameterNames(); params.hasMoreElements(); ) {
             String fieldName = params.nextElement();
             String fieldValue = request.getParameter(fieldName);
-            if ((fieldValue != null) && (fieldValue.length() > 0)) {
+            if ((fieldValue != null) && (!fieldValue.isEmpty())) {
                 fields.put(fieldName, fieldValue);
+                rawResponse.put(fieldName, fieldValue);
             }
         }
 
@@ -116,7 +123,6 @@ public class PaymentController {
         fields.remove("vnp_SecureHashType");
         fields.remove("vnp_SecureHash");
 
-        // Xác thực chữ ký xem có đúng là VNPay gọi không (chống giả mạo)
         List<String> fieldNames = new ArrayList<>(fields.keySet());
         Collections.sort(fieldNames);
         StringBuilder hashData = new StringBuilder();
@@ -124,7 +130,7 @@ public class PaymentController {
         while (itr.hasNext()) {
             String fieldName = itr.next();
             String fieldValue = fields.get(fieldName);
-            if ((fieldValue != null) && (fieldValue.length() > 0)) {
+            if ((fieldValue != null) && (!fieldValue.isEmpty())) {
                 hashData.append(fieldName);
                 hashData.append('=');
                 hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII));
@@ -137,21 +143,27 @@ public class PaymentController {
 
         if (signValue.equals(vnp_SecureHash)) {
             String orderCode = request.getParameter("vnp_TxnRef");
-            if ("00".equals(request.getParameter("vnp_ResponseCode"))) {
-                // THANH TOÁN THÀNH CÔNG -> Cập nhật Database
-                Order order = orderRepository.findByOrderCode(orderCode).orElse(null);
-                if(order != null) {
-                    order.setPaymentStatus("PAID");
-                    order.setPaymentMethod("VNPAY");
-                    orderRepository.save(order);
-                    log.info("💰 Đơn hàng {} đã thanh toán thành công qua VNPay!", orderCode);
-                }
-                return ResponseEntity.ok("Giao dịch thành công! Bạn có thể tắt trang này.");
+            String responseCode = request.getParameter("vnp_ResponseCode");
+            String transactionNo = request.getParameter("vnp_TransactionNo");
+            String transactionCode = "TXN-" + orderCode;
+            String amountStr = request.getParameter("vnp_Amount");
+            BigDecimal amount = amountStr != null ? new BigDecimal(amountStr).divide(BigDecimal.valueOf(100)) : BigDecimal.ZERO;
+
+            if ("00".equals(responseCode)) {
+                // THANH TOÁN THÀNH CÔNG
+                orderService.handlePaymentSuccess(
+                        orderCode, transactionCode, transactionNo, amount, responseCode, "Thành công", rawResponse);
+                return ResponseEntity.ok(ApiResponse.success(
+                        "Giao dịch thành công! Mã đơn: " + orderCode, "Thanh toán thành công"));
             } else {
-                return ResponseEntity.badRequest().body("Giao dịch thất bại / Bị hủy!");
+                // THANH TOÁN THẤT BẠI / BỊ HỦY -> TỰ ĐỘNG CHUYỂN CANCELLED & HOÀN KHO
+                orderService.handlePaymentFailure(
+                        orderCode, transactionCode, transactionNo, amount, responseCode, "Giao dịch không thành công", rawResponse);
+                return ResponseEntity.badRequest().body(ApiResponse.error(
+                        "Giao dịch thất bại hoặc bị hủy (Code: " + responseCode + ")"));
             }
         } else {
-            return ResponseEntity.badRequest().body("Chữ ký không hợp lệ (Dữ liệu bị hack)!");
+            return ResponseEntity.badRequest().body(ApiResponse.error("Chữ ký không hợp lệ!"));
         }
     }
 }

@@ -41,6 +41,12 @@ public class ProductDetailResponse {
         private String sku;
         private String variantName;
         private BigDecimal price;
+        private BigDecimal originalPrice;
+        private Integer weightGram;
+        private java.util.Map<String, Object> attributes;
+        private Boolean isActive;
         private Integer stockQuantity;
+        private Integer reservedQuantity;
+        private Integer availableStock;
     }
 }

@@ -1,14 +1,18 @@
 package com.minhtriet.se3979.catalogservice.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
 @Data
 @Builder
-@JsonInclude(JsonInclude.Include.NON_NULL) // Bí quyết: Nếu data là null thì tự động giấu đi, JSON sẽ rất sạch
+@NoArgsConstructor
+@AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ApiResponse<T> {
     private int status;
     private String message;
@@ -16,7 +20,6 @@ public class ApiResponse<T> {
     private String error;
     private LocalDateTime timestamp;
 
-    // Hàm tiện ích trả về Thành công (Có kèm Data)
     public static <T> ApiResponse<T> success(T data, String message) {
         return ApiResponse.<T>builder()
                 .status(200)
@@ -26,7 +29,10 @@ public class ApiResponse<T> {
                 .build();
     }
 
-    // Hàm tiện ích trả về Lỗi
+    public static <T> ApiResponse<T> success(T data) {
+        return success(data, "Thành công");
+    }
+
     public static <T> ApiResponse<T> error(int status, String error, String message) {
         return ApiResponse.<T>builder()
                 .status(status)

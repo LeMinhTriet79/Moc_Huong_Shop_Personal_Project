@@ -5,6 +5,7 @@ management:
   tracing:
     sampling:
       probability: 1.0
+
 spring:
   application:
     name: api-gateway
@@ -12,8 +13,26 @@ spring:
     base-url: http://localhost:9411
   cloud:
     gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowed-origins:
+              - "http://localhost:3000"
+              - "http://localhost:5173"
+              - "http://localhost:4200"
+            allowed-methods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+              - OPTIONS
+            allowed-headers:
+              - "*"
+            allow-credentials: true
+            max-age: 3600
       routes:
-        # 1. Định tuyến cho chức năng thực tế (TUYỆT ĐỐI KHÔNG DÙNG RewritePath ở đây)
+        # 1. Định tuyến chuẩn của từng Service
         - id: identity-service
           uri: lb://identity-service
           predicates:
@@ -29,7 +48,29 @@ spring:
           predicates:
             - Path=/api/order/**
 
-        # 2. Định tuyến bí mật để gom file cấu hình Swagger
+        # 2. Định tuyến Alias tiện lợi cho Frontend
+        - id: auth-alias
+          uri: lb://identity-service
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - RewritePath=/api/auth/(?<segment>.*), /api/identity/auth/${segment}
+
+        - id: products-alias
+          uri: lb://catalog-service
+          predicates:
+            - Path=/api/products/**
+          filters:
+            - RewritePath=/api/products/(?<segment>.*), /api/catalog/products/${segment}
+
+        - id: orders-alias
+          uri: lb://order-service
+          predicates:
+            - Path=/api/orders/**
+          filters:
+            - RewritePath=/api/orders/(?<segment>.*), /api/order/orders/${segment}
+
+        # 3. Định tuyến gom file cấu hình Swagger
         - id: openapi-identity
           uri: lb://identity-service
           predicates:
@@ -56,7 +97,6 @@ eureka:
     service-url:
       defaultZone: http://localhost:8761/eureka/
 
-# 3. Gom 3 cái Swagger lại làm 1 thanh xổ xuống
 springdoc:
   swagger-ui:
     urls:

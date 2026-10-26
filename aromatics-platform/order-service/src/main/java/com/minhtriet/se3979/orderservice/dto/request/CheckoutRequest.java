@@ -1,12 +1,30 @@
 package com.minhtriet.se3979.orderservice.dto.request;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.Map;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class CheckoutRequest {
-    private Map<String, Object> shippingAddress; // Thông tin địa chỉ khách chọn
+
+    @NotNull(message = "Địa chỉ nhận hàng không được để trống")
+    private Map<String, Object> shippingAddress;
+
+    @NotBlank(message = "Phương thức thanh toán không được để trống")
     private String paymentMethod; // VNPAY, MOMO, COD
-    private String notes; // Lời nhắn
-    private String idempotencyKey; // Sinh ngẫu nhiên từ Frontend để chống bấm đúp 2 lần
+
+    private String couponCode;
+
+    private String notes;
+
+    @NotBlank(message = "idempotencyKey không được để trống")
+    private String idempotencyKey;
 }

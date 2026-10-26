@@ -35,7 +35,6 @@ public class Order {
     @Builder.Default
     private String status = "PENDING_PAYMENT";
 
-    // Lưu thẳng thông tin địa chỉ thành JSON để sau này khách có đổi địa chỉ trong Profile thì hóa đơn cũ vẫn không bị thay đổi
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "shipping_address", nullable = false)
     private Map<String, Object> shippingAddress;
@@ -63,12 +62,26 @@ public class Order {
     @Builder.Default
     private String paymentStatus = "UNPAID";
 
-    // Khóa Idempotency giúp tránh việc khách bấm nút thanh toán 2 lần tạo ra 2 đơn hàng
     @Column(name = "idempotency_key", nullable = false, unique = true, length = 100)
     private String idempotencyKey;
 
     @Column(columnDefinition = "TEXT")
     private String notes;
+
+    @Column(name = "staff_notes", columnDefinition = "TEXT")
+    private String staffNotes;
+
+    @Column(name = "cancelled_reason", length = 500)
+    private String cancelledReason;
+
+    @Column(name = "cancelled_by", length = 20)
+    private String cancelledBy; // CUSTOMER, STAFF, ADMIN, SYSTEM
+
+    @Column(name = "confirmed_at")
+    private LocalDateTime confirmedAt;
+
+    @Column(name = "delivered_at")
+    private LocalDateTime deliveredAt;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -78,7 +91,6 @@ public class Order {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    // Quan hệ 1-N với OrderItem
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items;
 }

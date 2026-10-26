@@ -34,6 +34,12 @@ public class JwtUtil {
         return claims.get("role", String.class);
     }
 
+    // Trích xuất Họ tên (FullName)
+    public String extractFullName(String token) {
+        Claims claims = extractAllClaims(token);
+        return claims.get("fullName", String.class);
+    }
+
     // Kiểm tra còn hạn không
     public boolean isTokenValid(String token) {
         return !isTokenExpired(token);

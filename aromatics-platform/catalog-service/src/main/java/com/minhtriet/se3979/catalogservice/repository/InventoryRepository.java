@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -20,6 +21,10 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM Inventory i WHERE i.variant.id = :variantId")
     Optional<Inventory> findByVariantIdWithLock(@Param("variantId") Long variantId);
+
+    // Tìm các mặt hàng sắp hết hàng (quantity <= lowStockThreshold)
+    @Query("SELECT i FROM Inventory i JOIN FETCH i.variant v JOIN FETCH v.product p WHERE i.quantity <= i.lowStockThreshold ORDER BY i.quantity ASC")
+    List<Inventory> findLowStockInventories();
 
     void deleteByVariantId(Long variantId);
 }

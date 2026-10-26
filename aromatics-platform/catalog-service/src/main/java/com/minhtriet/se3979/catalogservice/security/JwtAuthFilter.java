@@ -44,10 +44,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 // Trích xuất Role từ token (VD: CUSTOMER, ADMIN)
                 String role = jwtUtil.extractRole(jwt);
+                Long userId = jwtUtil.extractUserId(jwt);
+                String fullName = jwtUtil.extractFullName(jwt);
+
+                AuthenticatedUser authenticatedUser = AuthenticatedUser.builder()
+                        .userId(userId)
+                        .email(userEmail)
+                        .role(role)
+                        .fullName(fullName)
+                        .build();
 
                 // Cấp quyền đi tiếp dựa trên thông tin có sẵn trong Token
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        userEmail,
+                        authenticatedUser,
                         null,
                         role != null ? Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role)) : Collections.emptyList()
                 );

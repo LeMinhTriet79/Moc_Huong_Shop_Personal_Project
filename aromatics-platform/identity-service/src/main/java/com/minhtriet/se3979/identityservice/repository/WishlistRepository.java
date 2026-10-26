@@ -5,12 +5,15 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface WishlistRepository extends JpaRepository<Wishlist, Long> {
-    // Lấy danh sách sản phẩm yêu thích của 1 user
     List<Wishlist> findByUserId(Long userId);
 
-    // Kiểm tra xem 1 user đã thích 1 sản phẩm cụ thể chưa
     boolean existsByUserIdAndProductId(Long userId, Long productId);
+
+    Optional<Wishlist> findByUserIdAndProductId(Long userId, Long productId);
+
+    void deleteByUserIdAndProductId(Long userId, Long productId);
 }

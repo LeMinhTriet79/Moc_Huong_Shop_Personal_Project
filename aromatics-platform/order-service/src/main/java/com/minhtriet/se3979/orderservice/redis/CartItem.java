@@ -17,6 +17,7 @@ public class CartItem {
     private String productName;
     private String variantName;
     private String productImageUrl;
+    private String sku;
     private BigDecimal price; // Giá tại thời điểm thêm vào giỏ
     private int quantity;
 }
