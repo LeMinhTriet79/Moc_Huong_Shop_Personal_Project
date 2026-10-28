@@ -597,15 +597,19 @@ export default function ProductDetailPage() {
                         </div>
                       </div>
 
-                      <p className="text-sm text-text-ink-black leading-relaxed">{rev.comment}</p>
+                      <p className="text-sm text-text-ink-black leading-relaxed">
+                        {rev.comment || (rev as any).content}
+                      </p>
 
                       {/* Staff/Admin Reply */}
-                      {rev.replyMessage && (
+                      {(rev.replyMessage || (rev as any).adminReply) && (
                         <div className="mt-3 pl-4 border-l-2 border-secondary bg-surface p-3 rounded-r-xl">
                           <span className="text-xs font-bold text-secondary uppercase block">
                             Phản hồi từ Mộc Hương:
                           </span>
-                          <p className="text-xs text-text-wood-muted mt-0.5">{rev.replyMessage}</p>
+                          <p className="text-xs text-text-wood-muted mt-0.5">
+                            {rev.replyMessage || (rev as any).adminReply}
+                          </p>
                         </div>
                       )}
                     </div>

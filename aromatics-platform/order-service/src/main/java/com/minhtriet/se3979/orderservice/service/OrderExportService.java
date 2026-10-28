@@ -10,5 +10,7 @@ public interface OrderExportService {
 
     byte[] exportOrdersToExcel(LocalDate fromDate, LocalDate toDate);
 
+    byte[] exportOrdersToExcel(LocalDate fromDate, LocalDate toDate, String status);
+
     DashboardStatsResponse getOrderStatistics();
 }

@@ -18,6 +18,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/order/orders")
 @RequiredArgsConstructor
@@ -56,21 +58,37 @@ public class OrderController {
 
     // 4. Hủy đơn hàng (Khi đang PENDING_PAYMENT, CONFIRMED, hoặc PREPARING)
     @PutMapping("/{orderId}/cancel")
-    public ResponseEntity<ApiResponse<String>> cancelOrder(
+    public ResponseEntity<ApiResponse<OrderResponse>> cancelOrder(
             @PathVariable Long orderId,
-            @RequestParam(required = false, defaultValue = "Khách hàng hủy đơn") String reason) {
-        orderService.cancelOrder(orderId, reason);
-        return ResponseEntity.ok(ApiResponse.success("OK", "Hủy đơn hàng thành công"));
+            @RequestParam(required = false) String reason,
+            @RequestBody(required = false) Map<String, String> body) {
+        String finalReason = reason;
+        if ((finalReason == null || finalReason.isBlank()) && body != null) {
+            finalReason = body.get("reason");
+        }
+        if (finalReason == null || finalReason.isBlank()) {
+            finalReason = "Khách hàng hủy đơn";
+        }
+        OrderResponse response = orderService.cancelOrder(orderId, finalReason);
+        return ResponseEntity.ok(ApiResponse.success(response, "Hủy đơn hàng thành công"));
     }
 
     // 5. Yêu cầu trả hàng / hoàn tiền (Khi đơn đã DELIVERED)
     @PostMapping("/{orderId}/return-request")
-    public ResponseEntity<ApiResponse<String>> requestReturn(
+    public ResponseEntity<ApiResponse<OrderResponse>> requestReturn(
             @PathVariable Long orderId,
-            @Valid @RequestBody ReturnOrderRequest request) {
+            @RequestBody(required = false) ReturnOrderRequest request,
+            @RequestParam(required = false) String reason) {
         Long userId = SecurityUtils.getCurrentUserId();
-        orderService.requestReturn(orderId, userId, request.getReason());
-        return ResponseEntity.ok(ApiResponse.success("OK", "Đã gửi yêu cầu trả hàng/hoàn tiền"));
+        String finalReason = reason;
+        if (request != null && request.getReason() != null && !request.getReason().isBlank()) {
+            finalReason = request.getReason();
+        }
+        if (finalReason == null || finalReason.isBlank()) {
+            finalReason = "Khách hàng yêu cầu trả hàng/hoàn tiền";
+        }
+        OrderResponse response = orderService.requestReturn(orderId, userId, finalReason);
+        return ResponseEntity.ok(ApiResponse.success(response, "Đã gửi yêu cầu trả hàng/hoàn tiền"));
     }
 
     // 6. Xuất hóa đơn bán hàng PDF (iText7)

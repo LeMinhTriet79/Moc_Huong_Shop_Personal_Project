@@ -9,6 +9,8 @@ import java.util.Map;
 @Data
 @Builder
 public class ErrorResponse {
+    @Builder.Default
+    private boolean success = false;
     private LocalDateTime timestamp;
     private int status;
     private String error;

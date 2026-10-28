@@ -26,8 +26,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Mở cửa public cho xem danh mục và sản phẩm
-                        .requestMatchers(HttpMethod.GET, "/api/catalog/products/**", "/api/catalog/categories/**").permitAll()
+                        // Mở cửa public cho xem danh mục, sản phẩm, tồn kho theo biến thể và đánh giá
+                        .requestMatchers(HttpMethod.GET, "/api/catalog/products/**", "/api/catalog/categories/**", "/api/catalog/inventory/variant/**", "/api/catalog/reviews/**").permitAll()
                         // API nội bộ: trừ kho, hoàn kho, lấy chi tiết biến thể (yêu cầu SYSTEM hoặc STAFF/ADMIN)
                         .requestMatchers("/api/catalog/inventory/deduct", "/api/catalog/inventory/restore",
                                 "/api/catalog/products/variants/*/internal", "/api/catalog/products/variants/batch-info")

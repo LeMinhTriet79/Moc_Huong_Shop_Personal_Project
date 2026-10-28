@@ -44,10 +44,15 @@ public class CouponServiceImpl implements CouponService {
     public CouponCalculationResult validateAndCalculateDiscount(
             Long userId, String couponCode, BigDecimal subtotal, BigDecimal shippingFee, List<CartItem> items) {
 
+        BigDecimal validSubtotal = subtotal != null ? subtotal : BigDecimal.ZERO;
+        BigDecimal validShipping = shippingFee != null ? shippingFee : BigDecimal.ZERO;
+        BigDecimal defaultTotal = validSubtotal.add(validShipping);
+
         if (couponCode == null || couponCode.isBlank()) {
             return CouponCalculationResult.builder()
                     .couponCode(couponCode)
                     .discountAmount(BigDecimal.ZERO)
+                    .finalTotal(defaultTotal)
                     .isValid(false)
                     .message("Mã giảm giá không được để trống")
                     .build();
@@ -58,6 +63,7 @@ public class CouponServiceImpl implements CouponService {
             return CouponCalculationResult.builder()
                     .couponCode(couponCode)
                     .discountAmount(BigDecimal.ZERO)
+                    .finalTotal(defaultTotal)
                     .isValid(false)
                     .message("Mã giảm giá không tồn tại")
                     .build();
@@ -68,6 +74,7 @@ public class CouponServiceImpl implements CouponService {
             return CouponCalculationResult.builder()
                     .couponCode(couponCode)
                     .discountAmount(BigDecimal.ZERO)
+                    .finalTotal(defaultTotal)
                     .isValid(false)
                     .message("Mã giảm giá hiện không hoạt động")
                     .build();
@@ -78,6 +85,7 @@ public class CouponServiceImpl implements CouponService {
             return CouponCalculationResult.builder()
                     .couponCode(couponCode)
                     .discountAmount(BigDecimal.ZERO)
+                    .finalTotal(defaultTotal)
                     .isValid(false)
                     .message("Mã giảm giá chưa đến thời gian áp dụng")
                     .build();
@@ -87,6 +95,7 @@ public class CouponServiceImpl implements CouponService {
             return CouponCalculationResult.builder()
                     .couponCode(couponCode)
                     .discountAmount(BigDecimal.ZERO)
+                    .finalTotal(defaultTotal)
                     .isValid(false)
                     .message("Mã giảm giá đã hết hạn sử dụng")
                     .build();
@@ -96,6 +105,7 @@ public class CouponServiceImpl implements CouponService {
             return CouponCalculationResult.builder()
                     .couponCode(couponCode)
                     .discountAmount(BigDecimal.ZERO)
+                    .finalTotal(defaultTotal)
                     .isValid(false)
                     .message("Mã giảm giá đã hết lượt sử dụng trên hệ thống")
                     .build();
@@ -107,6 +117,7 @@ public class CouponServiceImpl implements CouponService {
                 return CouponCalculationResult.builder()
                         .couponCode(couponCode)
                         .discountAmount(BigDecimal.ZERO)
+                        .finalTotal(defaultTotal)
                         .isValid(false)
                         .message("Bạn đã dùng hết số lượt cho phép (" + coupon.getMaxUsesPerUser() + " lần) của mã này")
                         .build();
@@ -117,6 +128,7 @@ public class CouponServiceImpl implements CouponService {
             return CouponCalculationResult.builder()
                     .couponCode(couponCode)
                     .discountAmount(BigDecimal.ZERO)
+                    .finalTotal(defaultTotal)
                     .isValid(false)
                     .message("Đơn hàng chưa đạt giá trị tối thiểu " + coupon.getMinOrderValue() + " đ để áp dụng mã")
                     .build();
@@ -129,6 +141,7 @@ public class CouponServiceImpl implements CouponService {
                 return CouponCalculationResult.builder()
                         .couponCode(couponCode)
                         .discountAmount(BigDecimal.ZERO)
+                        .finalTotal(defaultTotal)
                         .isValid(false)
                         .message("Mã giảm giá không áp dụng cho sản phẩm nào trong giỏ hàng của bạn")
                         .build();
@@ -137,8 +150,6 @@ public class CouponServiceImpl implements CouponService {
 
         // Tính toán số tiền được giảm
         BigDecimal discount = BigDecimal.ZERO;
-        BigDecimal validSubtotal = subtotal != null ? subtotal : BigDecimal.ZERO;
-        BigDecimal validShipping = shippingFee != null ? shippingFee : BigDecimal.ZERO;
 
         switch (coupon.getType()) {
             case PERCENTAGE -> {
@@ -151,9 +162,12 @@ public class CouponServiceImpl implements CouponService {
             case FREE_SHIPPING -> discount = coupon.getValue().min(validShipping);
         }
 
+        BigDecimal finalTotal = validSubtotal.add(validShipping).subtract(discount).max(BigDecimal.ZERO);
+
         return CouponCalculationResult.builder()
                 .couponCode(coupon.getCode())
                 .discountAmount(discount)
+                .finalTotal(finalTotal)
                 .isValid(true)
                 .message("Áp dụng mã giảm giá thành công")
                 .build();

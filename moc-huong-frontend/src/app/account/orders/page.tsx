@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { orderService } from '@/services/orderService';
 import { catalogService } from '@/services/catalogService';
 import { OrderResponse } from '@/types';
-import { formatCurrency, formatDate, ORDER_STATUS_MAP } from '@/lib/utils';
+import { formatCurrency, formatDate, getOrderStatusInfo } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 const STATUS_TABS: { label: string; value: string }[] = [
@@ -202,14 +202,9 @@ export default function OrderHistoryPage() {
       ) : (
         <div className="space-y-6">
           {filteredOrders.map((order) => {
-            const statusConfig = ORDER_STATUS_MAP[order.status] || {
-              label: order.status,
-              bg: 'bg-surface-container',
-              text: 'text-text-wood-muted',
-              icon: 'info',
-            };
+            const statusConfig = getOrderStatusInfo(order.status);
 
-            const canCancel = order.status === 'PENDING' || order.status === 'CONFIRMED';
+            const canCancel = ['PENDING', 'PENDING_PAYMENT', 'CONFIRMED', 'PREPARING', 'PROCESSING'].includes(order.status);
             const canReturn = order.status === 'DELIVERED';
 
             return (

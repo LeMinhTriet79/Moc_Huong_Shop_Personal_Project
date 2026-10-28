@@ -71,6 +71,12 @@ public class Order {
     @Column(name = "staff_notes", columnDefinition = "TEXT")
     private String staffNotes;
 
+    @Column(name = "tracking_number", length = 100)
+    private String trackingNumber;
+
+    @Column(name = "carrier", length = 100)
+    private String carrier;
+
     @Column(name = "cancelled_reason", length = 500)
     private String cancelledReason;
 

@@ -15,6 +15,8 @@ import java.util.Map;
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ErrorResponse {
+    @Builder.Default
+    private boolean success = false;
     private LocalDateTime timestamp;
     private int status;
     private String error;

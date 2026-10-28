@@ -61,15 +61,17 @@ export default function AdminCouponsPage() {
   const openEditModal = (c: CouponResponse) => {
     setEditingCoupon(c);
     setCode(c.code);
-    setTitle(c.title);
+    setTitle(c.title || (c as any).name || '');
     setDescription(c.description || '');
-    setDiscountType(c.discountType);
-    setDiscountValue(c.discountValue);
-    setMinOrderValue(c.minOrderValue);
+    setDiscountType((c.discountType || (c as any).type || 'PERCENTAGE') as any);
+    setDiscountValue(c.discountValue ?? (c as any).value ?? 10);
+    setMinOrderValue(c.minOrderValue ?? 0);
     setMaxDiscountAmount(c.maxDiscountAmount || 0);
-    setStartDate(c.startDate ? c.startDate.slice(0, 10) : '');
-    setEndDate(c.endDate ? c.endDate.slice(0, 10) : '');
-    setUsageLimit(c.usageLimit || 100);
+    const startRaw = c.startDate || (c as any).startsAt || '';
+    const endRaw = c.endDate || (c as any).expiresAt || '';
+    setStartDate(startRaw ? startRaw.slice(0, 10) : '');
+    setEndDate(endRaw ? endRaw.slice(0, 10) : '');
+    setUsageLimit(c.usageLimit ?? (c as any).maxUses ?? 100);
     setIsModalOpen(true);
   };
 
@@ -83,15 +85,21 @@ export default function AdminCouponsPage() {
     setIsSaving(true);
     const payload = {
       code: code.trim().toUpperCase(),
+      name: title.trim(),
       title: title.trim(),
       description: description.trim(),
+      type: discountType,
       discountType,
+      value: discountValue,
       discountValue,
       minOrderValue,
       maxDiscountAmount: maxDiscountAmount || undefined,
       startDate: `${startDate}T00:00:00`,
+      startsAt: `${startDate}T00:00:00`,
       endDate: `${endDate}T23:59:59`,
+      expiresAt: `${endDate}T23:59:59`,
       usageLimit,
+      maxUses: usageLimit,
       isActive: true,
     };
 
@@ -175,46 +183,53 @@ export default function AdminCouponsPage() {
                   </td>
                 </tr>
               ) : (
-                coupons.map((c) => (
-                  <tr key={c.id} className="hover:bg-surface-container-low transition-colors">
-                    <td className="p-4">
-                      <span className="font-mono font-bold text-primary bg-bg-warm-sand px-2.5 py-1 rounded-lg border border-border-bamboo text-sm">
-                        {c.code}
-                      </span>
-                    </td>
+                coupons.map((c) => {
+                  const cTitle = c.title || (c as any).name || 'Mã giảm giá';
+                  const cType = c.discountType || (c as any).type || 'PERCENTAGE';
+                  const cValue = c.discountValue ?? (c as any).value ?? 0;
+                  const cLimit = c.usageLimit ?? (c as any).maxUses;
+                  const cEnd = c.endDate || (c as any).expiresAt;
 
-                    <td className="p-4 max-w-xs">
-                      <span className="font-bold text-text-ink-black block">{c.title}</span>
-                      <span className="text-[11px] text-text-wood-muted">{c.description}</span>
-                    </td>
-
-                    <td className="p-4">
-                      <span className="font-semibold text-secondary block">
-                        {c.discountType === 'PERCENTAGE'
-                          ? `Giảm ${c.discountValue}%`
-                          : c.discountType === 'FIXED_AMOUNT'
-                          ? `Giảm ${formatCurrency(c.discountValue)}`
-                          : 'Miễn Phí Vận Chuyển'}
-                      </span>
-                      {c.maxDiscountAmount ? (
-                        <span className="text-[10px] text-text-wood-muted font-mono">
-                          Tối đa: {formatCurrency(c.maxDiscountAmount)}
+                  return (
+                    <tr key={c.id} className="hover:bg-surface-container-low transition-colors">
+                      <td className="p-4">
+                        <span className="font-mono font-bold text-primary bg-bg-warm-sand px-2.5 py-1 rounded-lg border border-border-bamboo text-sm">
+                          {c.code}
                         </span>
-                      ) : null}
-                    </td>
+                      </td>
 
-                    <td className="p-4 font-mono font-bold text-text-ink-black">
-                      {formatCurrency(c.minOrderValue)}
-                    </td>
+                      <td className="p-4 max-w-xs">
+                        <span className="font-bold text-text-ink-black block">{cTitle}</span>
+                        <span className="text-[11px] text-text-wood-muted">{c.description}</span>
+                      </td>
 
-                    <td className="p-4 font-mono">
-                      <span className="font-bold text-primary">{c.usedCount}</span>
-                      <span className="text-text-wood-muted"> / {c.usageLimit || '∞'}</span>
-                    </td>
+                      <td className="p-4">
+                        <span className="font-semibold text-secondary block">
+                          {cType === 'PERCENTAGE'
+                            ? `Giảm ${cValue}%`
+                            : cType === 'FIXED_AMOUNT'
+                            ? `Giảm ${formatCurrency(cValue)}`
+                            : 'Miễn Phí Vận Chuyển'}
+                        </span>
+                        {c.maxDiscountAmount ? (
+                          <span className="text-[10px] text-text-wood-muted font-mono">
+                            Tối đa: {formatCurrency(c.maxDiscountAmount)}
+                          </span>
+                        ) : null}
+                      </td>
 
-                    <td className="p-4 text-[11px] text-text-wood-muted">
-                      {formatDate(c.endDate)}
-                    </td>
+                      <td className="p-4 font-mono font-bold text-text-ink-black">
+                        {formatCurrency(c.minOrderValue)}
+                      </td>
+
+                      <td className="p-4 font-mono">
+                        <span className="font-bold text-primary">{c.usedCount}</span>
+                        <span className="text-text-wood-muted"> / {cLimit || '∞'}</span>
+                      </td>
+
+                      <td className="p-4 text-[11px] text-text-wood-muted">
+                        {formatDate(cEnd)}
+                      </td>
 
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
@@ -235,8 +250,9 @@ export default function AdminCouponsPage() {
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
+                );
+              })
+            )}
             </tbody>
           </table>
         </div>

@@ -25,7 +25,7 @@ public class CouponController {
     private final CartService cartService;
 
     // Lấy danh sách mã giảm giá khả dụng
-    @GetMapping("/available")
+    @GetMapping({"/available", "/active"})
     public ResponseEntity<ApiResponse<List<CouponResponse>>> getAvailableCoupons() {
         List<CouponResponse> coupons = couponService.getAvailableCoupons();
         return ResponseEntity.ok(ApiResponse.success(coupons, "Lấy danh sách mã giảm giá thành công"));
@@ -35,15 +35,23 @@ public class CouponController {
     @PostMapping("/preview")
     public ResponseEntity<ApiResponse<CouponCalculationResult>> previewCoupon(
             @Valid @RequestBody CouponPreviewRequest request) {
-        Long userId = SecurityUtils.getCurrentUserId();
-        List<CartItem> cartItems = cartService.getCart(userId);
+        Long userId = SecurityUtils.getCurrentUser().map(u -> u.getUserId()).orElse(null);
+        List<CartItem> cartItems = userId != null ? cartService.getCart(userId) : List.of();
 
-        BigDecimal subtotal = cartItems.stream()
-                .map(item -> item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal subtotal;
+        if (cartItems != null && !cartItems.isEmpty()) {
+            subtotal = cartItems.stream()
+                    .map(item -> item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        } else if (request.getSubtotal() != null && request.getSubtotal().compareTo(BigDecimal.ZERO) > 0) {
+            subtotal = request.getSubtotal();
+        } else {
+            subtotal = BigDecimal.ZERO;
+        }
 
-        // Mặc định phí ship giả định để tính mã FREE_SHIPPING (VD: 30,000 đ)
-        BigDecimal estimatedShippingFee = BigDecimal.valueOf(30000);
+        BigDecimal estimatedShippingFee = (request.getShippingFee() != null && request.getShippingFee().compareTo(BigDecimal.ZERO) >= 0)
+                ? request.getShippingFee()
+                : BigDecimal.valueOf(30000);
 
         CouponCalculationResult result = couponService.validateAndCalculateDiscount(
                 userId, request.getCouponCode(), subtotal, estimatedShippingFee, cartItems);

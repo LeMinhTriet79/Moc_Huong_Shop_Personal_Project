@@ -148,13 +148,16 @@ export interface InventoryResponse {
 export interface ReviewResponse {
   id: number;
   productId: number;
+  productName?: string;
   userId: number;
   orderId?: number;
   userName?: string;
   userAvatar?: string;
   rating: number;
   comment: string;
+  content?: string;
   replyMessage?: string;
+  adminReply?: string;
   repliedAt?: string;
   isVerifiedPurchase: boolean;
   isVisible: boolean;
@@ -185,14 +188,20 @@ export interface CouponResponse {
   id: number;
   code: string;
   title: string;
+  name?: string;
   description?: string;
   discountType: 'PERCENTAGE' | 'FIXED_AMOUNT' | 'FREE_SHIPPING';
+  type?: 'PERCENTAGE' | 'FIXED_AMOUNT' | 'FREE_SHIPPING';
   discountValue: number;
+  value?: number;
   minOrderValue: number;
   maxDiscountAmount?: number;
   startDate: string;
+  startsAt?: string;
   endDate: string;
+  expiresAt?: string;
   usageLimit?: number;
+  maxUses?: number;
   usedCount: number;
   isActive: boolean;
 }
@@ -207,11 +216,16 @@ export interface CouponCalculationResult {
 
 export type OrderStatus =
   | 'PENDING'
+  | 'PENDING_PAYMENT'
   | 'CONFIRMED'
   | 'PROCESSING'
+  | 'PREPARING'
   | 'SHIPPED'
+  | 'SHIPPING'
   | 'DELIVERED'
+  | 'COMPLETED'
   | 'CANCELLED'
+  | 'RETURN_REQUESTED'
   | 'RETURNED';
 
 export type PaymentMethod = 'COD' | 'VNPAY';

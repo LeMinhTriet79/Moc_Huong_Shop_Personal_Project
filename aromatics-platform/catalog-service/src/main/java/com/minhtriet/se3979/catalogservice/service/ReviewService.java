@@ -11,7 +11,7 @@ import java.util.List;
 public interface ReviewService {
 
     // Đăng đánh giá mới
-    Object createReview(Long productId, Long userId, ReviewCreateRequest request, List<MultipartFile> files);
+    ReviewResponse createReview(Long productId, Long userId, ReviewCreateRequest request, List<MultipartFile> files);
 
     // Lấy danh sách đánh giá của 1 sản phẩm
     Page<ReviewResponse> getProductReviews(Long productId, Pageable pageable);
@@ -23,11 +23,14 @@ public interface ReviewService {
     void deleteReview(Long reviewId, Long userId);
 
     // 3. Admin: Trả lời đánh giá
-    Object adminReplyReview(Long reviewId, String replyContent);
+    ReviewResponse adminReplyReview(Long reviewId, String replyContent);
 
     // 4. Admin: Ẩn/Hiện đánh giá (Kiểm duyệt)
-    void toggleReviewVisibility(Long reviewId);
+    ReviewResponse toggleReviewVisibility(Long reviewId);
 
     // Lấy danh sách đánh giá cho Admin (Thấy cả bài bị ẩn)
     Page<ReviewResponse> getAdminProductReviews(Long productId, Pageable pageable);
+
+    // Lấy tất cả đánh giá cho Admin với bộ lọc
+    Page<ReviewResponse> getAdminReviews(Long productId, Integer rating, Boolean isVisible, Pageable pageable);
 }

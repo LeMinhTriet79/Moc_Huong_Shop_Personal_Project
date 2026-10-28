@@ -76,8 +76,8 @@ export const orderService = {
     window.URL.revokeObjectURL(url);
   },
 
-  async createVNPayPayment(amount: number, orderInfo: string): Promise<{ paymentUrl: string }> {
-    const res = await api.get<ApiResponse<{ paymentUrl: string }>>('/api/order/payment/create-payment', {
+  async createVNPayPayment(orderId: number, amount?: number, orderInfo?: string): Promise<{ paymentUrl: string }> {
+    const res = await api.get<ApiResponse<{ paymentUrl: string }>>(`/api/order/payment/create-url/${orderId}`, {
       params: { amount, orderInfo },
     });
     return res.data.data;

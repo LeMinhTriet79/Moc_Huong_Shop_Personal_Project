@@ -3,17 +3,20 @@
 import React, { useState, useEffect } from 'react';
 import { orderService } from '@/services/orderService';
 import { OrderResponse } from '@/types';
-import { formatCurrency, formatDate, ORDER_STATUS_MAP } from '@/lib/utils';
+import { formatCurrency, formatDate, getOrderStatusInfo } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 const STATUS_FILTERS = [
   { label: 'Tất Cả', value: '' },
-  { label: 'Chờ Thanh Toán', value: 'PENDING' },
+  { label: 'Chờ Thanh Toán', value: 'PENDING_PAYMENT' },
   { label: 'Đã Xác Nhận', value: 'CONFIRMED' },
-  { label: 'Đang Chuẩn Bị', value: 'PROCESSING' },
-  { label: 'Đang Vận Chuyển', value: 'SHIPPED' },
+  { label: 'Đang Chuẩn Bị', value: 'PREPARING' },
+  { label: 'Đang Vận Chuyển', value: 'SHIPPING' },
   { label: 'Đã Giao Thành Công', value: 'DELIVERED' },
+  { label: 'Hoàn Tất', value: 'COMPLETED' },
   { label: 'Đã Hủy', value: 'CANCELLED' },
+  { label: 'Yêu Cầu Hoàn Trả', value: 'RETURN_REQUESTED' },
+  { label: 'Đã Trả Hàng', value: 'RETURNED' },
 ];
 
 export default function AdminOrdersPage() {
@@ -80,10 +83,13 @@ export default function AdminOrdersPage() {
   const openStatusModal = (order: OrderResponse) => {
     setUpdatingOrder(order);
     // Suggest next logical status in State Machine
-    if (order.status === 'PENDING') setNewStatus('CONFIRMED');
-    else if (order.status === 'CONFIRMED') setNewStatus('PROCESSING');
-    else if (order.status === 'PROCESSING') setNewStatus('SHIPPED');
-    else if (order.status === 'SHIPPED') setNewStatus('DELIVERED');
+    const s = order.status;
+    if (s === 'PENDING' || s === 'PENDING_PAYMENT') setNewStatus('CONFIRMED');
+    else if (s === 'CONFIRMED') setNewStatus('PREPARING');
+    else if (s === 'PROCESSING' || s === 'PREPARING') setNewStatus('SHIPPING');
+    else if (s === 'SHIPPED' || s === 'SHIPPING') setNewStatus('DELIVERED');
+    else if (s === 'DELIVERED') setNewStatus('COMPLETED');
+    else if (s === 'RETURN_REQUESTED') setNewStatus('RETURNED');
     else setNewStatus('CONFIRMED');
 
     setTrackingNumber(order.trackingNumber || '');
@@ -234,12 +240,7 @@ export default function AdminOrdersPage() {
                 </tr>
               ) : (
                 orders.map((order) => {
-                  const statusConfig = ORDER_STATUS_MAP[order.status] || {
-                    label: order.status,
-                    bg: 'bg-surface-container',
-                    text: 'text-text-wood-muted',
-                    icon: 'info',
-                  };
+                  const statusConfig = getOrderStatusInfo(order.status);
 
                   return (
                     <tr key={order.id} className="hover:bg-surface-container-low transition-colors">
@@ -361,14 +362,16 @@ export default function AdminOrdersPage() {
                   className="w-full p-2.5 bg-surface-container-low rounded-xl border border-border-bamboo text-xs text-text-ink-black focus:outline-none focus:border-primary font-semibold"
                 >
                   <option value="CONFIRMED">CONFIRMED — Đã Xác Nhận</option>
-                  <option value="PROCESSING">PROCESSING — Đang Chuẩn Bị & Đóng Gói</option>
-                  <option value="SHIPPED">SHIPPED — Đang Vận Chuyển Giao Hàng</option>
+                  <option value="PREPARING">PREPARING — Đang Chuẩn Bị & Đóng Gói</option>
+                  <option value="SHIPPING">SHIPPING — Đang Vận Chuyển Giao Hàng</option>
                   <option value="DELIVERED">DELIVERED — Đã Giao Thành Công</option>
+                  <option value="COMPLETED">COMPLETED — Hoàn Tất Đơn Hàng</option>
+                  <option value="RETURNED">RETURNED — Đã Trả Hàng & Hoàn Tiền</option>
                   <option value="CANCELLED">CANCELLED — Hủy Đơn Hàng</option>
                 </select>
               </div>
 
-              {newStatus === 'SHIPPED' && (
+              {(newStatus === 'SHIPPING' || newStatus === 'SHIPPED') && (
                 <>
                   <div>
                     <label className="block text-xs font-bold text-text-wood-muted uppercase mb-1">

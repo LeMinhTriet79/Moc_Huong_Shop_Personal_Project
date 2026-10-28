@@ -94,13 +94,18 @@ public class ProductController {
     public ResponseEntity<ApiResponse<ProductDetailResponse>> updateProduct(
             @PathVariable Long id,
             @RequestPart(value = "product", required = false) String productJson,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images,
             @RequestPart(value = "newImages", required = false) List<MultipartFile> newImages) {
         try {
             ProductUpdateRequest request = null;
             if (productJson != null && !productJson.isBlank()) {
                 request = objectMapper.readValue(productJson, ProductUpdateRequest.class);
             }
-            ProductDetailResponse response = productService.updateProduct(id, request, newImages);
+            List<MultipartFile> combinedImages = new java.util.ArrayList<>();
+            if (images != null) combinedImages.addAll(images);
+            if (newImages != null) combinedImages.addAll(newImages);
+
+            ProductDetailResponse response = productService.updateProduct(id, request, combinedImages.isEmpty() ? null : combinedImages);
             return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật sản phẩm thành công!"));
         } catch (AppException ae) {
             throw ae;

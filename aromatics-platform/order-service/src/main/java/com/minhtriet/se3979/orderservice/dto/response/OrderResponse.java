@@ -31,6 +31,8 @@ public class OrderResponse {
     private String paymentStatus;
     private String notes;
     private String staffNotes;
+    private String trackingNumber;
+    private String carrier;
     private String cancelledReason;
     private String cancelledBy;
     private LocalDateTime confirmedAt;
@@ -72,6 +74,8 @@ public class OrderResponse {
                 .paymentStatus(order.getPaymentStatus())
                 .notes(order.getNotes())
                 .staffNotes(order.getStaffNotes())
+                .trackingNumber(order.getTrackingNumber())
+                .carrier(order.getCarrier())
                 .cancelledReason(order.getCancelledReason())
                 .cancelledBy(order.getCancelledBy())
                 .confirmedAt(order.getConfirmedAt())

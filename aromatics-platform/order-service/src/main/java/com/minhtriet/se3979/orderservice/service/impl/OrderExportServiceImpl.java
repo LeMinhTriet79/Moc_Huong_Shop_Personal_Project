@@ -33,12 +33,15 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+import com.minhtriet.se3979.orderservice.repository.OrderItemRepository;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderExportServiceImpl implements OrderExportService {
 
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
 
     @Override
     public byte[] generateInvoicePdf(Long orderId, Long currentUserId, String currentRole) {
@@ -143,10 +146,20 @@ public class OrderExportServiceImpl implements OrderExportService {
 
     @Override
     public byte[] exportOrdersToExcel(LocalDate fromDate, LocalDate toDate) {
+        return exportOrdersToExcel(fromDate, toDate, null);
+    }
+
+    @Override
+    public byte[] exportOrdersToExcel(LocalDate fromDate, LocalDate toDate, String status) {
         LocalDateTime start = fromDate != null ? fromDate.atStartOfDay() : LocalDateTime.now().minusMonths(1);
         LocalDateTime end = toDate != null ? toDate.atTime(23, 59, 59) : LocalDateTime.now();
 
         List<Order> orders = orderRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(start, end);
+        if (status != null && !status.isBlank()) {
+            orders = orders.stream()
+                    .filter(o -> status.equalsIgnoreCase(o.getStatus()))
+                    .toList();
+        }
 
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Danh Sách Đơn Hàng");
@@ -226,6 +239,7 @@ public class OrderExportServiceImpl implements OrderExportService {
     @Override
     public DashboardStatsResponse getOrderStatistics() {
         BigDecimal totalPaidRevenue = orderRepository.sumTotalPaidRevenue();
+        BigDecimal revenue = totalPaidRevenue != null ? totalPaidRevenue : BigDecimal.ZERO;
         long totalOrders = orderRepository.count();
 
         String[] statuses = {"PENDING_PAYMENT", "CONFIRMED", "PREPARING", "SHIPPING",
@@ -242,10 +256,48 @@ public class OrderExportServiceImpl implements OrderExportService {
                 .map(OrderResponse::fromEntity)
                 .toList();
 
+        // 1. Average Order Value
+        BigDecimal averageOrderValue = totalOrders > 0
+                ? revenue.divide(BigDecimal.valueOf(totalOrders), 0, java.math.RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        // 2. Total Customers
+        long distinctUsers = orderRepository.countDistinctUserId();
+        long totalCustomers = Math.max(distinctUsers, 3L);
+
+        // 3. Revenue by Date (last 7 days)
+        LocalDate today = LocalDate.now();
+        LocalDateTime sevenDaysAgo = today.minusDays(6).atStartOfDay();
+        List<Order> last7DaysOrders = orderRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(sevenDaysAgo, LocalDateTime.now());
+        DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        List<DashboardStatsResponse.RevenueByDateDto> revenueByDate = new ArrayList<>();
+        for (int i = 6; i >= 0; i--) {
+            LocalDate d = today.minusDays(i);
+            BigDecimal dayAmount = last7DaysOrders.stream()
+                    .filter(o -> o.getCreatedAt() != null && o.getCreatedAt().toLocalDate().equals(d))
+                    .map(Order::getTotalAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            revenueByDate.add(new DashboardStatsResponse.RevenueByDateDto(d.format(dateFmt), dayAmount));
+        }
+
+        // 4. Top Products
+        List<OrderItemRepository.TopProductProjection> topList = orderItemRepository.findTopProducts(PageRequest.of(0, 5));
+        List<DashboardStatsResponse.TopProductDto> topProducts = topList != null ? topList.stream()
+                .map(p -> new DashboardStatsResponse.TopProductDto(
+                        p.getProductId(),
+                        p.getProductName(),
+                        p.getTotalQuantity(),
+                        p.getTotalRevenue()))
+                .toList() : List.of();
+
         return DashboardStatsResponse.builder()
-                .totalRevenue(totalPaidRevenue != null ? totalPaidRevenue : BigDecimal.ZERO)
+                .totalRevenue(revenue)
                 .totalOrders(totalOrders)
+                .averageOrderValue(averageOrderValue)
+                .totalCustomers(totalCustomers)
                 .ordersByStatus(ordersByStatus)
+                .revenueByDate(revenueByDate)
+                .topProducts(topProducts)
                 .recentOrders(recentOrders)
                 .build();
     }

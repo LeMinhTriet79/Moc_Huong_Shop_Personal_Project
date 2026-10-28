@@ -17,6 +17,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     } else if (role !== 'STAFF' && role !== 'ADMIN') {
       toast.error('Khu vực dành riêng cho Nhân viên (STAFF) và Quản trị viên (ADMIN)');
       router.push('/');
+    } else if (role === 'STAFF' && (pathname.startsWith('/admin/users') || pathname.startsWith('/admin/coupons'))) {
+      toast.error('Chức năng này chỉ dành riêng cho Quản trị viên (ADMIN)');
+      router.push('/admin');
     }
   }, [isAuthenticated, role, pathname, router]);
 
@@ -43,7 +46,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { label: 'Sản Phẩm & Biến Thể', href: '/admin/products', icon: 'inventory_2' },
     { label: 'Quản Lý Tồn Kho', href: '/admin/inventory', icon: 'warehouse' },
     { label: 'Kiểm Duyệt Đánh Giá', href: '/admin/reviews', icon: 'rate_review' },
-    { label: 'Mã Giảm Giá & Voucher', href: '/admin/coupons', icon: 'loyalty' },
+    ...(role === 'ADMIN' ? [{ label: 'Mã Giảm Giá & Voucher', href: '/admin/coupons', icon: 'loyalty' }] : []),
   ];
 
   const navSystem = [

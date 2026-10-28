@@ -34,4 +34,15 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     // Thêm hàm này vào để bảo mật: Tìm review theo ID của review và ID của user
     Optional<Review> findByIdAndUserId(Long id, Long userId);
     Page<Review> findByProductId(Long productId, Pageable pageable);
+
+    @Query("SELECT r FROM Review r WHERE " +
+           "(:productId IS NULL OR r.product.id = :productId) AND " +
+           "(:rating IS NULL OR r.rating = :rating) AND " +
+           "(:isVisible IS NULL OR r.isVisible = :isVisible) " +
+           "ORDER BY r.createdAt DESC")
+    Page<Review> findAllByAdminFilters(
+            @Param("productId") Long productId,
+            @Param("rating") Integer rating,
+            @Param("isVisible") Boolean isVisible,
+            Pageable pageable);
 }

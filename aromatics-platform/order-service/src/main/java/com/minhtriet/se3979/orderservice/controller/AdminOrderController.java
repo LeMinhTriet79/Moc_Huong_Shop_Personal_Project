@@ -37,16 +37,35 @@ public class AdminOrderController {
     @GetMapping
     public ResponseEntity<ApiResponse<Page<OrderResponse>>> getAllOrders(
             @RequestParam(required = false) String orderCode,
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String paymentMethod,
             @RequestParam(required = false) String paymentStatus,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
+        String effectiveCode = (orderCode != null && !orderCode.isBlank()) ? orderCode : keyword;
+
+        LocalDateTime effectiveFrom = fromDate;
+        if (effectiveFrom == null && startDate != null && !startDate.isBlank()) {
+            try {
+                effectiveFrom = LocalDate.parse(startDate).atStartOfDay();
+            } catch (Exception ignored) {}
+        }
+
+        LocalDateTime effectiveTo = toDate;
+        if (effectiveTo == null && endDate != null && !endDate.isBlank()) {
+            try {
+                effectiveTo = LocalDate.parse(endDate).atTime(23, 59, 59);
+            } catch (Exception ignored) {}
+        }
+
         Page<OrderResponse> orders = orderService.getAllOrdersAdmin(
-                orderCode, status, paymentMethod, paymentStatus, fromDate, toDate,
+                effectiveCode, status, paymentMethod, paymentStatus, effectiveFrom, effectiveTo,
                 PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
 
         return ResponseEntity.ok(ApiResponse.success(orders, "Lấy danh sách đơn hàng thành công"));
@@ -69,7 +88,8 @@ public class AdminOrderController {
         Long userId = SecurityUtils.getCurrentUserId();
 
         OrderDetailResponse response = orderService.updateOrderStatus(
-                orderId, request.getStatus(), request.getNote(), role, userId);
+                orderId, request.getStatus(), request.getNote(), role, userId,
+                request.getTrackingNumber(), request.getCarrier());
 
         return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật trạng thái đơn hàng thành công"));
     }
@@ -88,9 +108,26 @@ public class AdminOrderController {
     @GetMapping("/export-excel")
     public ResponseEntity<byte[]> exportOrdersToExcel(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String status) {
 
-        byte[] excelBytes = orderExportService.exportOrdersToExcel(fromDate, toDate);
+        LocalDate effectiveFrom = fromDate;
+        if (effectiveFrom == null && startDate != null && !startDate.isBlank()) {
+            try {
+                effectiveFrom = LocalDate.parse(startDate);
+            } catch (Exception ignored) {}
+        }
+
+        LocalDate effectiveTo = toDate;
+        if (effectiveTo == null && endDate != null && !endDate.isBlank()) {
+            try {
+                effectiveTo = LocalDate.parse(endDate);
+            } catch (Exception ignored) {}
+        }
+
+        byte[] excelBytes = orderExportService.exportOrdersToExcel(effectiveFrom, effectiveTo, status);
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=orders-report.xlsx")

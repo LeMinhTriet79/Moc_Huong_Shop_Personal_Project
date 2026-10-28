@@ -62,17 +62,23 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public ProductDetailResponse getProductDetail(String slug) {
-        Optional<ProductDetailResponse> cached = productCacheService.getProductDetailBySlug(slug);
+    public ProductDetailResponse getProductDetail(String slugOrId) {
+        Optional<ProductDetailResponse> cached = productCacheService.getProductDetailBySlug(slugOrId);
         if (cached.isPresent()) {
             return cached.get();
         }
 
-        Product product = productRepository.findBySlug(slug)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy sản phẩm với slug: " + slug));
+        Product product;
+        if (slugOrId != null && slugOrId.matches("^\\d+$")) {
+            product = productRepository.findById(Long.parseLong(slugOrId))
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy sản phẩm với id: " + slugOrId));
+        } else {
+            product = productRepository.findBySlug(slugOrId)
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy sản phẩm với slug: " + slugOrId));
+        }
 
         ProductDetailResponse detail = mapToDetailResponse(product);
-        productCacheService.cacheProductDetail(slug, detail);
+        productCacheService.cacheProductDetail(slugOrId, detail);
         return detail;
     }
 
@@ -374,37 +380,82 @@ public class ProductServiceImpl implements ProductService {
 
     private ProductResponse mapToResponse(Product p) {
         String primaryImage = null;
-        if (p.getImages() != null) {
+        List<ProductDetailResponse.ImageDto> imageDtos = List.of();
+        if (p.getImages() != null && !p.getImages().isEmpty()) {
+            imageDtos = p.getImages().stream()
+                    .map(img -> ProductDetailResponse.ImageDto.builder()
+                            .id(img.getId())
+                            .imageUrl(img.getImageUrl())
+                            .isPrimary(img.getIsPrimary())
+                            .build())
+                    .toList();
             primaryImage = p.getImages().stream()
-                    .filter(ProductImage::getIsPrimary)
+                    .filter(img -> Boolean.TRUE.equals(img.getIsPrimary()))
                     .map(ProductImage::getImageUrl)
                     .findFirst()
-                    .orElse(null);
-            if (primaryImage == null && !p.getImages().isEmpty()) {
-                primaryImage = p.getImages().get(0).getImageUrl();
-            }
+                    .orElse(p.getImages().get(0).getImageUrl());
         }
 
         BigDecimal startPrice = BigDecimal.ZERO;
+        List<ProductDetailResponse.VariantDto> variantDtos = List.of();
         if (p.getVariants() != null && !p.getVariants().isEmpty()) {
             startPrice = p.getVariants().stream()
                     .map(ProductVariant::getPrice)
                     .min(BigDecimal::compareTo)
                     .orElse(BigDecimal.ZERO);
+            variantDtos = p.getVariants().stream()
+                    .map(var -> {
+                        int stock = 0;
+                        int reserved = 0;
+                        if (var.getInventory() != null) {
+                            stock = var.getInventory().getQuantity();
+                            reserved = var.getInventory().getReservedQuantity();
+                        } else {
+                            var invOpt = inventoryRepository.findByVariantId(var.getId());
+                            if (invOpt.isPresent()) {
+                                stock = invOpt.get().getQuantity();
+                                reserved = invOpt.get().getReservedQuantity();
+                            }
+                        }
+                        return ProductDetailResponse.VariantDto.builder()
+                                .id(var.getId())
+                                .sku(var.getSku())
+                                .variantName(var.getVariantName())
+                                .price(var.getPrice())
+                                .originalPrice(var.getOriginalPrice())
+                                .weightGram(var.getWeightGram())
+                                .attributes(var.getAttributes())
+                                .isActive(var.getIsActive())
+                                .stockQuantity(stock)
+                                .reservedQuantity(reserved)
+                                .availableStock(Math.max(0, stock - reserved))
+                                .build();
+                    })
+                    .toList();
         }
+
+        Long categoryId = p.getCategory() != null ? p.getCategory().getId() : null;
+        String categoryName = p.getCategory() != null ? p.getCategory().getName() : null;
 
         return ProductResponse.builder()
                 .id(p.getId())
                 .name(p.getName())
                 .slug(p.getSlug())
                 .shortDescription(p.getShortDescription())
+                .description(p.getDescription())
                 .brand(p.getBrand())
+                .categoryId(categoryId)
+                .categoryName(categoryName)
                 .averageRating(p.getAverageRating())
                 .totalReviews(p.getTotalReviews())
+                .reviewCount(p.getTotalReviews())
                 .totalSold(p.getTotalSold())
                 .primaryImageUrl(primaryImage)
                 .startingPrice(startPrice)
+                .basePrice(startPrice)
                 .isActive(p.getIsActive())
+                .images(imageDtos)
+                .variants(variantDtos)
                 .build();
     }
 
@@ -453,6 +504,14 @@ public class ProductServiceImpl implements ProductService {
                 .toList()
                 : List.of();
 
+        BigDecimal basePrice = BigDecimal.ZERO;
+        if (product.getVariants() != null && !product.getVariants().isEmpty()) {
+            basePrice = product.getVariants().stream()
+                    .map(ProductVariant::getPrice)
+                    .min(BigDecimal::compareTo)
+                    .orElse(BigDecimal.ZERO);
+        }
+
         return ProductDetailResponse.builder()
                 .id(product.getId())
                 .name(product.getName())
@@ -460,10 +519,14 @@ public class ProductServiceImpl implements ProductService {
                 .shortDescription(product.getShortDescription())
                 .description(product.getDescription())
                 .brand(product.getBrand())
+                .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
+                .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
                 .tags(product.getTags())
                 .averageRating(product.getAverageRating())
                 .totalReviews(product.getTotalReviews())
+                .reviewCount(product.getTotalReviews())
                 .totalSold(product.getTotalSold())
+                .basePrice(basePrice)
                 .images(imageDtos)
                 .variants(variantDtos)
                 .isActive(product.getIsActive())

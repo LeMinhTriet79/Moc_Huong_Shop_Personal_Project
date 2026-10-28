@@ -117,6 +117,13 @@ export default function CheckoutPage() {
     }
 
     setIsPlacingOrder(true);
+    try {
+      // Đảm bảo giỏ hàng trên server Redis đã đồng bộ đầy đủ các món từ local
+      await useCartStore.getState().syncLocalCartToRemote();
+    } catch (e) {
+      console.warn('Sync cart before checkout warning:', e);
+    }
+
     const idempotencyKey = crypto.randomUUID();
 
     const shippingAddress: OrderShippingAddress = {
@@ -144,6 +151,7 @@ export default function CheckoutPage() {
         toast.loading('Đang khởi tạo cổng thanh toán VNPay...');
         try {
           const vnpayRes = await orderService.createVNPayPayment(
+            order.id,
             order.totalAmount,
             `Thanh toan don hang ${order.orderCode}`
           );

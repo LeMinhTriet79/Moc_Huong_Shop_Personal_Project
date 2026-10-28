@@ -42,22 +42,54 @@ public class PaymentController {
     @GetMapping("/create-url/{orderId}")
     public ResponseEntity<ApiResponse<Map<String, String>>> createPaymentUrl(
             @PathVariable Long orderId, HttpServletRequest request) {
+        return buildVNPayUrl(orderId, null, null, request);
+    }
 
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+    @GetMapping("/create-payment")
+    public ResponseEntity<ApiResponse<Map<String, String>>> createPayment(
+            @RequestParam(required = false) Long orderId,
+            @RequestParam(required = false) BigDecimal amount,
+            @RequestParam(required = false) String orderInfo,
+            HttpServletRequest request) {
+        return buildVNPayUrl(orderId, amount, orderInfo, request);
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, String>>> buildVNPayUrl(
+            Long orderId, BigDecimal amountParam, String orderInfoParam, HttpServletRequest request) {
+
+        String txnRef;
+        long amountVal;
+        String info;
+
+        if (orderId != null) {
+            Order order = orderRepository.findById(orderId)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+            txnRef = order.getOrderCode();
+            BigDecimal actualAmount = (amountParam != null && amountParam.compareTo(BigDecimal.ZERO) > 0)
+                    ? amountParam : order.getTotalAmount();
+            amountVal = actualAmount.multiply(BigDecimal.valueOf(100)).longValue();
+            info = (orderInfoParam != null && !orderInfoParam.isBlank())
+                    ? orderInfoParam : "Thanh toan don hang " + order.getOrderCode();
+        } else {
+            txnRef = "MH" + System.currentTimeMillis();
+            BigDecimal actualAmount = (amountParam != null && amountParam.compareTo(BigDecimal.ZERO) > 0)
+                    ? amountParam : BigDecimal.valueOf(100000);
+            amountVal = actualAmount.multiply(BigDecimal.valueOf(100)).longValue();
+            info = (orderInfoParam != null && !orderInfoParam.isBlank())
+                    ? orderInfoParam : "Thanh toan don hang " + txnRef;
+        }
 
         String vnp_Version = "2.1.0";
         String vnp_Command = "pay";
-        long amount = order.getTotalAmount().multiply(BigDecimal.valueOf(100)).longValue();
 
         Map<String, String> vnp_Params = new HashMap<>();
         vnp_Params.put("vnp_Version", vnp_Version);
         vnp_Params.put("vnp_Command", vnp_Command);
         vnp_Params.put("vnp_TmnCode", vnp_TmnCode);
-        vnp_Params.put("vnp_Amount", String.valueOf(amount));
+        vnp_Params.put("vnp_Amount", String.valueOf(amountVal));
         vnp_Params.put("vnp_CurrCode", "VND");
-        vnp_Params.put("vnp_TxnRef", order.getOrderCode());
-        vnp_Params.put("vnp_OrderInfo", "Thanh toan don hang " + order.getOrderCode());
+        vnp_Params.put("vnp_TxnRef", txnRef);
+        vnp_Params.put("vnp_OrderInfo", info);
         vnp_Params.put("vnp_OrderType", "other");
         vnp_Params.put("vnp_Locale", "vn");
         vnp_Params.put("vnp_ReturnUrl", vnp_ReturnUrl);

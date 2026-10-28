@@ -25,13 +25,13 @@ public class Review {
     private Product product;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "variant_id", nullable = false)
+    @JoinColumn(name = "variant_id")
     private ProductVariant variant;
 
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "order_item_id", nullable = false, unique = true)
+    @Column(name = "order_item_id")
     private Long orderItemId;
 
     @Column(nullable = false)

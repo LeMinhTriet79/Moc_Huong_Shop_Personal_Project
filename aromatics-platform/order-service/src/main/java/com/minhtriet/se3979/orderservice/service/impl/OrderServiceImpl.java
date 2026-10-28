@@ -258,7 +258,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Transactional
     @Override
-    public void cancelOrder(Long orderId, String reason) {
+    public OrderResponse cancelOrder(Long orderId, String reason) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng id: " + orderId));
 
@@ -270,9 +270,9 @@ public class OrderServiceImpl implements OrderService {
             throw new AppException(HttpStatus.FORBIDDEN, "Bạn không có quyền hủy đơn hàng này!");
         }
 
-        // Chỉ cho phép hủy khi đang PENDING_PAYMENT, CONFIRMED, hoặc PREPARING
-        List<String> cancellableStatuses = List.of("PENDING_PAYMENT", "CONFIRMED", "PREPARING");
-        if (!cancellableStatuses.contains(order.getStatus())) {
+        // Chỉ cho phép hủy khi đang PENDING, PENDING_PAYMENT, CONFIRMED, hoặc PREPARING/PROCESSING
+        List<String> cancellableStatuses = List.of("PENDING", "PENDING_PAYMENT", "CONFIRMED", "PREPARING", "PROCESSING");
+        if (!cancellableStatuses.contains(order.getStatus().toUpperCase())) {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Không thể hủy đơn hàng khi đang ở trạng thái: " + order.getStatus() + ". Vui lòng yêu cầu trả hàng nếu đã giao!");
         }
@@ -283,32 +283,34 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus("CANCELLED");
         order.setCancelledReason(reason != null && !reason.isBlank() ? reason : "Khách hàng yêu cầu hủy đơn");
         order.setCancelledBy(cancelledBy);
-        orderRepository.save(order);
+        Order savedOrder = orderRepository.save(order);
 
         // Lưu lịch sử
         OrderStatusHistory history = OrderStatusHistory.builder()
-                .order(order)
+                .order(savedOrder)
                 .fromStatus(previousStatus)
                 .toStatus("CANCELLED")
                 .changedByType(cancelledBy)
                 .changedById(currentUserId)
-                .note(order.getCancelledReason())
+                .note(savedOrder.getCancelledReason())
                 .build();
         orderStatusHistoryRepository.save(history);
 
         // Hoàn lại lượt dùng coupon nếu có
-        couponService.refundCouponUsage(order.getId());
+        couponService.refundCouponUsage(savedOrder.getId());
 
         // Phát sự kiện hoàn kho
-        publishOrderCancelledEvent(order);
+        publishOrderCancelledEvent(savedOrder);
 
         // Phát sự kiện đổi trạng thái
-        publishStatusChangedEvent(order, previousStatus, "CANCELLED", order.getCancelledReason());
+        publishStatusChangedEvent(savedOrder, previousStatus, "CANCELLED", savedOrder.getCancelledReason());
+
+        return OrderResponse.fromEntity(savedOrder);
     }
 
     @Transactional
     @Override
-    public void requestReturn(Long orderId, Long userId, String reason) {
+    public OrderResponse requestReturn(Long orderId, Long userId, String reason) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng id: " + orderId));
 
@@ -323,10 +325,10 @@ public class OrderServiceImpl implements OrderService {
 
         String previousStatus = order.getStatus();
         order.setStatus("RETURN_REQUESTED");
-        orderRepository.save(order);
+        Order savedOrder = orderRepository.save(order);
 
         OrderStatusHistory history = OrderStatusHistory.builder()
-                .order(order)
+                .order(savedOrder)
                 .fromStatus(previousStatus)
                 .toStatus("RETURN_REQUESTED")
                 .changedByType("CUSTOMER")
@@ -335,13 +337,26 @@ public class OrderServiceImpl implements OrderService {
                 .build();
         orderStatusHistoryRepository.save(history);
 
-        publishStatusChangedEvent(order, previousStatus, "RETURN_REQUESTED", history.getNote());
+        publishStatusChangedEvent(savedOrder, previousStatus, "RETURN_REQUESTED", history.getNote());
+
+        return OrderResponse.fromEntity(savedOrder);
     }
 
     @Override
     public Page<OrderResponse> getCustomerOrders(Long userId, String status, Pageable pageable) {
-        if (status != null && !status.isBlank()) {
-            return orderRepository.findByUserIdAndStatus(userId, status.trim().toUpperCase(), pageable)
+        if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status.trim())) {
+            String s = status.trim().toUpperCase();
+            List<String> candidateStatuses;
+            if ("PENDING".equals(s) || "PENDING_PAYMENT".equals(s)) {
+                candidateStatuses = List.of("PENDING", "PENDING_PAYMENT");
+            } else if ("PROCESSING".equals(s) || "PREPARING".equals(s)) {
+                candidateStatuses = List.of("PROCESSING", "PREPARING");
+            } else if ("SHIPPED".equals(s) || "SHIPPING".equals(s)) {
+                candidateStatuses = List.of("SHIPPED", "SHIPPING");
+            } else {
+                candidateStatuses = List.of(s);
+            }
+            return orderRepository.findByUserIdAndStatusIn(userId, candidateStatuses, pageable)
                     .map(OrderResponse::fromEntity);
         }
         return orderRepository.findByUserId(userId, pageable).map(OrderResponse::fromEntity);
@@ -406,15 +421,30 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public OrderDetailResponse updateOrderStatus(
             Long orderId, String newStatus, String note, String changedByType, Long changedById) {
+        return updateOrderStatus(orderId, newStatus, note, changedByType, changedById, null, null);
+    }
+
+    @Transactional
+    @Override
+    public OrderDetailResponse updateOrderStatus(
+            Long orderId, String newStatus, String note, String changedByType, Long changedById,
+            String trackingNumber, String carrier) {
 
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng với id: " + orderId));
 
-        String currentStatus = order.getStatus();
-        String targetStatus = newStatus.trim().toUpperCase();
+        String currentStatus = normalizeStatus(order.getStatus());
+        String targetStatus = normalizeStatus(newStatus);
 
         // Kiểm tra State Machine
         validateStateTransition(currentStatus, targetStatus);
+
+        if (trackingNumber != null && !trackingNumber.isBlank()) {
+            order.setTrackingNumber(trackingNumber);
+        }
+        if (carrier != null && !carrier.isBlank()) {
+            order.setCarrier(carrier);
+        }
 
         LocalDateTime now = LocalDateTime.now();
         if ("CONFIRMED".equalsIgnoreCase(targetStatus)) {
@@ -577,8 +607,19 @@ public class OrderServiceImpl implements OrderService {
         log.warn("🚨 Đơn hàng {} đã bị hủy tự động do thanh toán thất bại", orderCode);
     }
 
+    private String normalizeStatus(String status) {
+        if (status == null) return null;
+        String s = status.trim().toUpperCase();
+        if ("PENDING".equals(s)) return "PENDING_PAYMENT";
+        if ("PROCESSING".equals(s)) return "PREPARING";
+        if ("SHIPPED".equals(s)) return "SHIPPING";
+        return s;
+    }
+
     private void validateStateTransition(String from, String to) {
-        if (from.equalsIgnoreCase(to)) return;
+        String normFrom = normalizeStatus(from);
+        String normTo = normalizeStatus(to);
+        if (normFrom == null || normTo == null || normFrom.equalsIgnoreCase(normTo)) return;
 
         Map<String, List<String>> allowedTransitions = Map.of(
                 "PENDING_PAYMENT", List.of("CONFIRMED", "CANCELLED"),
@@ -592,8 +633,8 @@ public class OrderServiceImpl implements OrderService {
                 "RETURNED", List.of()
         );
 
-        List<String> validNext = allowedTransitions.getOrDefault(from, List.of());
-        if (!validNext.contains(to)) {
+        List<String> validNext = allowedTransitions.getOrDefault(normFrom, List.of());
+        if (!validNext.contains(normTo)) {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Chuyển trạng thái không hợp lệ: không thể chuyển từ '" + from + "' sang '" + to + "'!");
         }
@@ -674,6 +715,8 @@ public class OrderServiceImpl implements OrderService {
                 .paymentStatus(order.getPaymentStatus())
                 .notes(order.getNotes())
                 .staffNotes(order.getStaffNotes())
+                .trackingNumber(order.getTrackingNumber())
+                .carrier(order.getCarrier())
                 .cancelledReason(order.getCancelledReason())
                 .cancelledBy(order.getCancelledBy())
                 .confirmedAt(order.getConfirmedAt())

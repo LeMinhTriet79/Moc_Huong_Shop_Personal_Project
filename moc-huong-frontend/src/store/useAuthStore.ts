@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { AuthResponse, UserResponse, UserRole } from '@/types';
 import api from '@/lib/axios';
+import { useCartStore } from './useCartStore';
+import { useWishlistStore } from './useWishlistStore';
 
 interface AuthState {
   user: UserResponse | null;
@@ -44,6 +46,9 @@ export const useAuthStore = create<AuthState>()(
         });
         // Fetch full profile in the background
         get().fetchProfile();
+        // Sync local offline items to server Redis cart & fetch wishlist
+        useCartStore.getState().syncLocalCartToRemote();
+        useWishlistStore.getState().fetchWishlist();
       },
 
       logout: async () => {
@@ -55,6 +60,8 @@ export const useAuthStore = create<AuthState>()(
         } catch (e) {
           console.warn('Logout API call failed', e);
         } finally {
+          useCartStore.getState().closeCart();
+          useCartStore.setState({ items: [] });
           set({
             user: null,
             accessToken: null,

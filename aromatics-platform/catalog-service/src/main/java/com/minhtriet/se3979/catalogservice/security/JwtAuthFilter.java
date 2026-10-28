@@ -30,6 +30,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
+        // Nếu là internal request (có X-Internal-Secret hoặc đã được authenticate ROLE_SYSTEM), bỏ qua JWT filter
+        if (request.getHeader("X-Internal-Secret") != null ||
+                (SecurityContextHolder.getContext().getAuthentication() != null &&
+                 SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                         .anyMatch(a -> a.getAuthority().equals("ROLE_SYSTEM")))) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         final String authHeader = request.getHeader("Authorization");
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {

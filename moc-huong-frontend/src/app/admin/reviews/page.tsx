@@ -43,7 +43,7 @@ export default function AdminReviewsPage() {
 
   const openReplyModal = (rev: ReviewResponse) => {
     setReplyReviewItem(rev);
-    setReplyMessage(rev.replyMessage || '');
+    setReplyMessage(rev.replyMessage || rev.adminReply || '');
   };
 
   const handleReplySubmit = async (e: React.FormEvent) => {
@@ -133,13 +133,15 @@ export default function AdminReviewsPage() {
                     </td>
 
                     <td className="p-4 max-w-xs">
-                      <p className="text-text-ink-black leading-relaxed line-clamp-2">{rev.comment}</p>
+                      <p className="text-text-ink-black leading-relaxed line-clamp-2">
+                        {rev.comment || rev.content}
+                      </p>
                     </td>
 
                     <td className="p-4 max-w-xs">
-                      {rev.replyMessage ? (
+                      {rev.replyMessage || rev.adminReply ? (
                         <p className="text-text-wood-muted italic line-clamp-2 text-[11px] bg-bg-warm-sand/50 p-2 rounded-lg border border-border-bamboo/60">
-                          {rev.replyMessage}
+                          {rev.replyMessage || rev.adminReply}
                         </p>
                       ) : (
                         <span className="text-text-wood-muted text-[11px] italic">Chưa phản hồi</span>
@@ -199,7 +201,7 @@ export default function AdminReviewsPage() {
               Phản Hồi Đánh Giá — {replyReviewItem.userName || `User #${replyReviewItem.userId}`}
             </h3>
             <p className="text-xs text-text-wood-muted bg-bg-warm-sand/50 p-3 rounded-xl border border-border-bamboo">
-              “{replyReviewItem.comment}”
+              “{replyReviewItem.comment || replyReviewItem.content}”
             </p>
 
             <form onSubmit={handleReplySubmit} className="space-y-4">

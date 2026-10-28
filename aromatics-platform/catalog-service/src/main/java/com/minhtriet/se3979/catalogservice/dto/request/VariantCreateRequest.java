@@ -1,5 +1,6 @@
 package com.minhtriet.se3979.catalogservice.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -30,7 +31,12 @@ public class VariantCreateRequest {
 
     private BigDecimal originalPrice;
 
+    @JsonAlias({"weightGrams"})
     private Integer weightGram;
+
+    public Integer getWeightGrams() {
+        return weightGram;
+    }
 
     private Map<String, Object> attributes;
 

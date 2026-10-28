@@ -16,6 +16,30 @@ import java.util.Map;
 public class DashboardStatsResponse {
     private BigDecimal totalRevenue;
     private long totalOrders;
+    private BigDecimal averageOrderValue;
+    private long totalCustomers;
     private Map<String, Long> ordersByStatus;
+    private List<RevenueByDateDto> revenueByDate;
+    private List<TopProductDto> topProducts;
     private List<OrderResponse> recentOrders;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RevenueByDateDto {
+        private String date;
+        private BigDecimal amount;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TopProductDto {
+        private Long productId;
+        private String productName;
+        private Long totalQuantity;
+        private BigDecimal totalRevenue;
+    }
 }

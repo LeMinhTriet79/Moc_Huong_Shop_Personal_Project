@@ -25,8 +25,13 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
 
     Page<Order> findByUserIdAndStatus(Long userId, String status, Pageable pageable);
 
+    Page<Order> findByUserIdAndStatusIn(Long userId, List<String> statuses, Pageable pageable);
+
     @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.paymentStatus = 'PAID'")
     BigDecimal sumTotalPaidRevenue();
+
+    @Query("SELECT COUNT(DISTINCT o.userId) FROM Order o")
+    long countDistinctUserId();
 
     long countByStatus(String status);
 

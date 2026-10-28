@@ -26,6 +26,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Cho phép truy cập giao diện Swagger UI mà không cần đăng nhập
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/error", "/api/order/payment/vnpay-return").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/order/coupons/available", "/api/order/coupons/active").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/order/coupons/preview").permitAll()
                         // Tất cả các API của giỏ hàng và đơn hàng ĐỀU PHẢI đăng nhập (có token)
                         .requestMatchers("/api/order/**").authenticated()
                         .anyRequest().authenticated()

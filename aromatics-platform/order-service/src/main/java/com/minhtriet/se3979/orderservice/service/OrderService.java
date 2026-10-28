@@ -14,9 +14,9 @@ public interface OrderService {
 
     OrderResponse checkout(Long userId, CheckoutRequest request);
 
-    void cancelOrder(Long orderId, String reason);
+    OrderResponse cancelOrder(Long orderId, String reason);
 
-    void requestReturn(Long orderId, Long userId, String reason);
+    OrderResponse requestReturn(Long orderId, Long userId, String reason);
 
     Page<OrderResponse> getCustomerOrders(Long userId, String status, Pageable pageable);
 
@@ -30,6 +30,10 @@ public interface OrderService {
 
     OrderDetailResponse updateOrderStatus(
             Long orderId, String newStatus, String note, String changedByType, Long changedById);
+
+    OrderDetailResponse updateOrderStatus(
+            Long orderId, String newStatus, String note, String changedByType, Long changedById,
+            String trackingNumber, String carrier);
 
     void updateStaffNotes(Long orderId, String staffNotes);
 

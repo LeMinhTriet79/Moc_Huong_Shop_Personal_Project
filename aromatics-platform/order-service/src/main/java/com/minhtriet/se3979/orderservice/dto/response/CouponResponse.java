@@ -33,6 +33,13 @@ public class CouponResponse {
     private Boolean isActive;
     private LocalDateTime createdAt;
 
+    public String getTitle() { return name; }
+    public CouponType getDiscountType() { return type; }
+    public BigDecimal getDiscountValue() { return value; }
+    public Integer getUsageLimit() { return maxUses; }
+    public LocalDateTime getStartDate() { return startsAt; }
+    public LocalDateTime getEndDate() { return expiresAt; }
+
     public static CouponResponse fromEntity(Coupon c) {
         return CouponResponse.builder()
                 .id(c.getId())

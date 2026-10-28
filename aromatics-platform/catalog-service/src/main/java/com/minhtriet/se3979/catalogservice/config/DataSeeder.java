@@ -4,8 +4,10 @@ import com.minhtriet.se3979.catalogservice.entity.Category;
 import com.minhtriet.se3979.catalogservice.entity.Inventory;
 import com.minhtriet.se3979.catalogservice.entity.Product;
 import com.minhtriet.se3979.catalogservice.entity.ProductVariant;
+import com.minhtriet.se3979.catalogservice.entity.ProductImage;
 import com.minhtriet.se3979.catalogservice.repository.CategoryRepository;
 import com.minhtriet.se3979.catalogservice.repository.InventoryRepository;
+import com.minhtriet.se3979.catalogservice.repository.ProductImageRepository;
 import com.minhtriet.se3979.catalogservice.repository.ProductRepository;
 import com.minhtriet.se3979.catalogservice.repository.ProductVariantRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ public class DataSeeder implements CommandLineRunner {
     private final ProductRepository productRepository;
     private final ProductVariantRepository variantRepository;
     private final InventoryRepository inventoryRepository;
+    private final ProductImageRepository productImageRepository;
 
     @Override
     public void run(String... args) {
@@ -157,7 +160,7 @@ public class DataSeeder implements CommandLineRunner {
         Product p = Product.builder()
                 .category(cat)
                 .name(name)
-                .slug(slug + "-" + System.currentTimeMillis())
+                .slug(slug)
                 .shortDescription(shortDesc)
                 .description("<p>" + shortDesc + ". Sản phẩm tuyển chọn thủ công từ Mộc Hương Shop.</p>")
                 .brand(brand)
@@ -169,6 +172,44 @@ public class DataSeeder implements CommandLineRunner {
                 .totalSold(12)
                 .build();
         Product savedProduct = productRepository.save(p);
+
+        // Lưu 2 ảnh chất lượng cao mẫu
+        String img1;
+        String img2;
+        if (slug.contains("nhang")) {
+            img1 = "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?w=800";
+            img2 = "https://images.unsplash.com/photo-1544816155-12df9643f363?w=800";
+        } else if (slug.contains("nu") || slug.contains("vong-tram")) {
+            img1 = "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800";
+            img2 = "https://images.unsplash.com/photo-1515377905703-c4788e51af15?w=800";
+        } else if (slug.contains("tinh-dau")) {
+            img1 = "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?w=800";
+            img2 = "https://images.unsplash.com/photo-1617897903246-719242758050?w=800";
+        } else if (slug.contains("vong-tay") || slug.contains("vong-go")) {
+            img1 = "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=800";
+            img2 = "https://images.unsplash.com/photo-1611080626919-7cf5a9dbab5b?w=800";
+        } else {
+            img1 = "https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=800";
+            img2 = "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=800";
+        }
+
+        productImageRepository.save(ProductImage.builder()
+                .product(savedProduct)
+                .cloudinaryPublicId("seed-" + slug + "-1")
+                .imageUrl(img1)
+                .isPrimary(true)
+                .sortOrder(0)
+                .altText(name + " - Ảnh chính")
+                .build());
+
+        productImageRepository.save(ProductImage.builder()
+                .product(savedProduct)
+                .cloudinaryPublicId("seed-" + slug + "-2")
+                .imageUrl(img2)
+                .isPrimary(false)
+                .sortOrder(1)
+                .altText(name + " - Ảnh chi tiết")
+                .build());
 
         int sort = 0;
         for (VariantSeed vs : variants) {

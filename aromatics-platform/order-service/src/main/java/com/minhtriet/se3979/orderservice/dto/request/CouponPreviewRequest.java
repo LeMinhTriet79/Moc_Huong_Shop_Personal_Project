@@ -14,4 +14,8 @@ public class CouponPreviewRequest {
 
     @NotBlank(message = "Mã giảm giá không được để trống")
     private String couponCode;
+
+    private java.math.BigDecimal subtotal;
+
+    private java.math.BigDecimal shippingFee;
 }

@@ -7,6 +7,8 @@ import { formatCurrency } from '@/lib/utils';
 import { useWishlistStore } from '@/store/useWishlistStore';
 import { useCartStore } from '@/store/useCartStore';
 
+import { catalogService } from '@/services/catalogService';
+
 interface ProductCardProps {
   product: ProductResponse;
 }
@@ -19,19 +21,29 @@ export default function ProductCard({ product }: ProductCardProps) {
   const primaryImg =
     product.images?.find((img) => img.isPrimary)?.imageUrl ||
     product.images?.[0]?.imageUrl ||
+    (product as any).primaryImageUrl ||
     'https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?w=500';
 
   const displayPrice =
+    product.basePrice ||
     product.startingPrice ||
     (product.variants && product.variants.length > 0
       ? Math.min(...product.variants.map((v) => v.price))
-      : product.basePrice);
+      : 0);
 
   const handleQuickAdd = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    const variant = product.variants?.[0];
+    let variant = product.variants?.[0];
+    if (!variant) {
+      try {
+        const detail = await catalogService.getProductById(product.slug || product.id);
+        variant = detail?.variants?.[0];
+      } catch (err) {
+        console.error('Failed to fetch product detail for variant', err);
+      }
+    }
     if (!variant) return;
 
     await addItem({

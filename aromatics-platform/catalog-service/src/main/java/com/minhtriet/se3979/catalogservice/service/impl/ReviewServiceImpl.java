@@ -36,18 +36,32 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Transactional
     @Override
-    public Object createReview(Long productId, Long userId, ReviewCreateRequest request, List<MultipartFile> files) {
+    public ReviewResponse createReview(Long productId, Long userId, ReviewCreateRequest request, List<MultipartFile> files) {
+        if (productId == null) {
+            productId = request.getProductId();
+        }
+        if (productId == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu ID sản phẩm!");
+        }
 
-        // 1. FAIL FAST: Mỗi order_item chỉ được đánh giá 1 lần
-        if (reviewRepository.existsByOrderItemId(request.getOrderItemId())) {
+        // 1. FAIL FAST: Mỗi order_item chỉ được đánh giá 1 lần (nếu có orderItemId)
+        if (request.getOrderItemId() != null && reviewRepository.existsByOrderItemId(request.getOrderItemId())) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Bạn đã đánh giá cho sản phẩm này trong đơn hàng rồi!");
         }
 
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy sản phẩm!"));
 
-        ProductVariant variant = variantRepository.findById(request.getVariantId())
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy phiên bản sản phẩm!"));
+        ProductVariant variant = null;
+        if (request.getVariantId() != null) {
+            variant = variantRepository.findById(request.getVariantId()).orElse(null);
+        }
+        if (variant == null) {
+            List<ProductVariant> variants = variantRepository.findByProductId(productId);
+            if (!variants.isEmpty()) {
+                variant = variants.get(0);
+            }
+        }
 
         List<String> uploadedCloudinaryIds = new ArrayList<>();
 
@@ -85,12 +99,12 @@ public class ReviewServiceImpl implements ReviewService {
                 review.setImages(reviewImages);
             }
 
-            reviewRepository.saveAndFlush(review);
+            review = reviewRepository.saveAndFlush(review);
 
             // 4. Cập nhật điểm số và xóa cache
             recalculateProductRating(product);
 
-            return "Đánh giá sản phẩm thành công! Cảm ơn bạn đã phản hồi.";
+            return mapToReviewResponse(review);
 
         } catch (Exception e) {
             // Compensating Transaction
@@ -120,23 +134,39 @@ public class ReviewServiceImpl implements ReviewService {
         return reviews.map(this::mapToReviewResponse);
     }
 
+    @Override
+    public Page<ReviewResponse> getAdminReviews(Long productId, Integer rating, Boolean isVisible, Pageable pageable) {
+        Page<Review> reviews = reviewRepository.findAllByAdminFilters(productId, rating, isVisible, pageable);
+        return reviews.map(this::mapToReviewResponse);
+    }
+
     private ReviewResponse mapToReviewResponse(Review review) {
         List<String> imageUrls = review.getImages() != null ?
                 review.getImages().stream().map(ReviewImage::getImageUrl).toList() :
                 new ArrayList<>();
 
         String variantName = review.getVariant() != null ? review.getVariant().getVariantName() : null;
+        Long prodId = review.getProduct() != null ? review.getProduct().getId() : null;
+        String prodName = review.getProduct() != null ? review.getProduct().getName() : null;
+        boolean verified = review.getOrderItemId() != null;
 
         return ReviewResponse.builder()
                 .id(review.getId())
+                .productId(prodId)
+                .productName(prodName)
                 .userId(review.getUserId())
+                .userName("Khách hàng #" + review.getUserId())
                 .variantName(variantName)
                 .rating(review.getRating())
                 .title(review.getTitle())
                 .content(review.getContent())
+                .comment(review.getContent())
                 .images(imageUrls)
                 .adminReply(review.getAdminReply())
+                .replyMessage(review.getAdminReply())
+                .repliedAt(review.getAdminRepliedAt())
                 .isVisible(review.getIsVisible())
+                .isVerifiedPurchase(verified)
                 .createdAt(review.getCreatedAt())
                 .build();
     }
@@ -181,26 +211,27 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Transactional
     @Override
-    public Object adminReplyReview(Long reviewId, String replyContent) {
+    public ReviewResponse adminReplyReview(Long reviewId, String replyContent) {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đánh giá!"));
 
         review.setAdminReply(replyContent);
         review.setAdminRepliedAt(LocalDateTime.now());
-        reviewRepository.save(review);
-        return "Đã trả lời bình luận của khách hàng!";
+        review = reviewRepository.save(review);
+        return mapToReviewResponse(review);
     }
 
     @Transactional
     @Override
-    public void toggleReviewVisibility(Long reviewId) {
+    public ReviewResponse toggleReviewVisibility(Long reviewId) {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đánh giá!"));
 
         review.setIsVisible(!review.getIsVisible());
-        reviewRepository.saveAndFlush(review);
+        review = reviewRepository.saveAndFlush(review);
 
         recalculateProductRating(review.getProduct());
+        return mapToReviewResponse(review);
     }
 
     private void recalculateProductRating(Product product) {

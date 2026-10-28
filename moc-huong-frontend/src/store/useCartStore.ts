@@ -13,6 +13,7 @@ interface CartState {
   closeCart: () => void;
   toggleCart: () => void;
   fetchCart: () => Promise<void>;
+  syncLocalCartToRemote: () => Promise<void>;
   addItem: (item: CartItem) => Promise<void>;
   updateQuantity: (productId: number, variantId: number, quantity: number) => Promise<void>;
   removeItem: (productId: number, variantId: number) => Promise<void>;
@@ -47,6 +48,31 @@ export const useCartStore = create<CartState>()(
         } finally {
           set({ isLoading: false });
         }
+      },
+
+      syncLocalCartToRemote: async () => {
+        const { isAuthenticated } = useAuthStore.getState();
+        if (!isAuthenticated) return;
+
+        const localItems = get().items;
+        if (localItems.length > 0) {
+          for (const item of localItems) {
+            try {
+              await api.post('/api/order/cart/add', {
+                productId: item.productId,
+                variantId: item.variantId,
+                productName: item.productName,
+                variantName: item.variantName,
+                productImageUrl: item.productImageUrl,
+                price: item.price,
+                quantity: item.quantity,
+              });
+            } catch (err) {
+              console.warn(`Sync item ${item.productId}-${item.variantId} failed`, err);
+            }
+          }
+        }
+        await get().fetchCart();
       },
 
       addItem: async (newItem: CartItem) => {

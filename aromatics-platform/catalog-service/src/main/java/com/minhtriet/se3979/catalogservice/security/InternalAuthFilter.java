@@ -39,7 +39,7 @@ public class InternalAuthFilter extends OncePerRequestFilter {
                     .build();
 
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                    systemUser, null, List.of(new SimpleGrantedAuthority("ROLE_SYSTEM"), new SimpleGrantedAuthority("ROLE_ADMIN")));
+                    systemUser, null, List.of(new SimpleGrantedAuthority("ROLE_SYSTEM"), new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("ROLE_STAFF")));
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
         }

@@ -1,5 +1,6 @@
 package com.minhtriet.se3979.orderservice.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.minhtriet.se3979.orderservice.entity.Coupon.CouponType;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -23,13 +24,16 @@ public class CouponRequest {
     private String code;
 
     @NotBlank(message = "Tên mã giảm giá không được để trống")
+    @JsonAlias({"title"})
     private String name;
 
     @NotNull(message = "Loại mã giảm giá không được để trống")
+    @JsonAlias({"discountType"})
     private CouponType type;
 
     @NotNull(message = "Giá trị giảm không được để trống")
     @DecimalMin(value = "0.0", inclusive = false, message = "Giá trị giảm phải lớn hơn 0")
+    @JsonAlias({"discountValue"})
     private BigDecimal value;
 
     private BigDecimal maxDiscountAmount;
@@ -37,6 +41,7 @@ public class CouponRequest {
     @Builder.Default
     private BigDecimal minOrderValue = BigDecimal.ZERO;
 
+    @JsonAlias({"usageLimit"})
     private Integer maxUses;
 
     @Builder.Default
@@ -47,8 +52,10 @@ public class CouponRequest {
     private List<Long> applicableCategoryIds;
 
     @NotNull(message = "Thời gian bắt đầu không được để trống")
+    @JsonAlias({"startDate"})
     private LocalDateTime startsAt;
 
+    @JsonAlias({"endDate"})
     private LocalDateTime expiresAt;
 
     @Builder.Default

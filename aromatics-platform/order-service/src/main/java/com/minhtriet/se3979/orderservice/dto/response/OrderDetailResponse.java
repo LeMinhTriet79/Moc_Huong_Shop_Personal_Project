@@ -29,6 +29,8 @@ public class OrderDetailResponse {
     private String paymentStatus;
     private String notes;
     private String staffNotes;
+    private String trackingNumber;
+    private String carrier;
     private String cancelledReason;
     private String cancelledBy;
     private LocalDateTime confirmedAt;
