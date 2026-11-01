@@ -14,11 +14,16 @@ import com.minhtriet.se3979.orderservice.dto.response.OrderResponse;
 import com.minhtriet.se3979.orderservice.entity.Order;
 import com.minhtriet.se3979.orderservice.entity.OrderItem;
 import com.minhtriet.se3979.orderservice.exception.AppException;
+import com.minhtriet.se3979.orderservice.repository.OrderItemRepository;
 import com.minhtriet.se3979.orderservice.repository.OrderRepository;
 import com.minhtriet.se3979.orderservice.service.OrderExportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -28,12 +33,13 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-
-import com.minhtriet.se3979.orderservice.repository.OrderItemRepository;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -84,10 +90,10 @@ public class OrderExportServiceImpl implements OrderExportService {
             // Địa chỉ nhận hàng
             if (order.getShippingAddress() != null) {
                 var addr = order.getShippingAddress();
-                String recipient = String.valueOf(addr.getOrDefault("recipientName", "N/A"));
+                String recipient = stripAccents(String.valueOf(addr.getOrDefault("recipientName", "N/A")));
                 String phone = String.valueOf(addr.getOrDefault("phoneNumber", "N/A"));
-                String address = String.valueOf(addr.getOrDefault("streetAddress", ""));
-                document.add(new Paragraph("Nguoi nhan: " + recipient + " - SĐT: " + phone));
+                String address = stripAccents(String.valueOf(addr.getOrDefault("streetAddress", "")));
+                document.add(new Paragraph("Nguoi nhan: " + recipient + " - SDT: " + phone));
                 document.add(new Paragraph("Dia chi giao hang: " + address));
             }
             document.add(new Paragraph("\n"));
@@ -98,48 +104,47 @@ public class OrderExportServiceImpl implements OrderExportService {
 
             table.addHeaderCell(new Cell().add(new Paragraph("San pham").setBold()));
             table.addHeaderCell(new Cell().add(new Paragraph("Phien ban").setBold()));
-            table.addHeaderCell(new Cell().add(new Paragraph("Don gia").setBold()));
-            table.addHeaderCell(new Cell().add(new Paragraph("SL").setBold()));
-            table.addHeaderCell(new Cell().add(new Paragraph("Thanh tien").setBold()));
+            table.addHeaderCell(new Cell().add(new Paragraph("Don gia (VND)").setBold().setTextAlignment(TextAlignment.RIGHT)));
+            table.addHeaderCell(new Cell().add(new Paragraph("SL").setBold().setTextAlignment(TextAlignment.CENTER)));
+            table.addHeaderCell(new Cell().add(new Paragraph("Thanh tien (VND)").setBold().setTextAlignment(TextAlignment.RIGHT)));
 
             if (order.getItems() != null) {
                 for (OrderItem item : order.getItems()) {
-                    table.addCell(new Cell().add(new Paragraph(item.getProductName() != null ? item.getProductName() : "")));
-                    table.addCell(new Cell().add(new Paragraph(item.getVariantName() != null ? item.getVariantName() : "")));
-                    table.addCell(new Cell().add(new Paragraph(df.format(item.getUnitPrice()) + " d")));
-                    table.addCell(new Cell().add(new Paragraph(String.valueOf(item.getQuantity()))));
-                    table.addCell(new Cell().add(new Paragraph(df.format(item.getSubtotal()) + " d")));
+                    String pName = stripAccents(item.getProductName() != null ? item.getProductName() : "San pham");
+                    String vName = stripAccents(item.getVariantName() != null ? item.getVariantName() : "-");
+
+                    table.addCell(new Cell().add(new Paragraph(pName)));
+                    table.addCell(new Cell().add(new Paragraph(vName)));
+                    table.addCell(new Cell().add(new Paragraph(df.format(item.getUnitPrice())).setTextAlignment(TextAlignment.RIGHT)));
+                    table.addCell(new Cell().add(new Paragraph(String.valueOf(item.getQuantity())).setTextAlignment(TextAlignment.CENTER)));
+                    table.addCell(new Cell().add(new Paragraph(df.format(item.getSubtotal())).setTextAlignment(TextAlignment.RIGHT)));
                 }
             }
+
             document.add(table);
-
-            // Tổng kết
             document.add(new Paragraph("\n"));
-            document.add(new Paragraph("Tam tinh: " + df.format(order.getSubtotal()) + " d").setTextAlignment(TextAlignment.RIGHT));
-            document.add(new Paragraph("Phi van chuyen: " + df.format(order.getShippingFee()) + " d").setTextAlignment(TextAlignment.RIGHT));
-            if (order.getDiscountAmount() != null && order.getDiscountAmount().compareTo(BigDecimal.ZERO) > 0) {
-                document.add(new Paragraph("Giam gia (" + (order.getCouponCode() != null ? order.getCouponCode() : "") + "): -"
-                        + df.format(order.getDiscountAmount()) + " d").setTextAlignment(TextAlignment.RIGHT));
-            }
-            Paragraph total = new Paragraph("TONG THANH TOAN: " + df.format(order.getTotalAmount()) + " d")
-                    .setBold()
-                    .setFontSize(14)
-                    .setTextAlignment(TextAlignment.RIGHT)
-                    .setFontColor(ColorConstants.RED);
-            document.add(total);
 
-            document.add(new Paragraph("\nCam on quy khach da tin tuong va dong hanh cung Moc Huong Shop!")
-                    .setItalic()
+            // Tổng kết tiền tệ
+            Paragraph totals = new Paragraph()
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .add("Tam tinh: " + df.format(order.getSubtotal()) + " VND\n")
+                    .add("Phi van chuyen: " + df.format(order.getShippingFee()) + " VND\n")
+                    .add("Giam gia: -" + df.format(order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO) + " VND\n")
+                    .add(new Paragraph("Tong thanh toan: " + df.format(order.getTotalAmount()) + " VND").setBold().setFontSize(14));
+            document.add(totals);
+
+            Paragraph footer = new Paragraph("\nCam on quy khach da tin tuong va dong hanh cung Moc Huong Shop!\nHotline ho tro: 1900 8888 | Website: https://mochuong.vn")
                     .setTextAlignment(TextAlignment.CENTER)
-                    .setMarginTop(30));
+                    .setFontSize(10)
+                    .setFontColor(ColorConstants.GRAY)
+                    .setMarginTop(30);
+            document.add(footer);
 
             document.close();
             return out.toByteArray();
 
-        } catch (AppException ae) {
-            throw ae;
         } catch (Exception e) {
-            log.error("Lỗi khi xuất hóa đơn PDF", e);
+            log.error("Lỗi khi tạo hóa đơn PDF", e);
             throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "Lỗi khi tạo hóa đơn PDF: " + e.getMessage());
         }
     }
@@ -151,20 +156,24 @@ public class OrderExportServiceImpl implements OrderExportService {
 
     @Override
     public byte[] exportOrdersToExcel(LocalDate fromDate, LocalDate toDate, String status) {
-        LocalDateTime start = fromDate != null ? fromDate.atStartOfDay() : LocalDateTime.now().minusMonths(1);
-        LocalDateTime end = toDate != null ? toDate.atTime(23, 59, 59) : LocalDateTime.now();
+        LocalDateTime start = fromDate != null ? fromDate.atStartOfDay() : null;
+        LocalDateTime end = toDate != null ? toDate.atTime(LocalTime.MAX) : null;
+        List<Order> orders;
+        if (start != null && end != null) {
+            orders = orderRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(start, end);
+        } else {
+            orders = orderRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
+        }
 
-        List<Order> orders = orderRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(start, end);
         if (status != null && !status.isBlank()) {
             orders = orders.stream()
                     .filter(o -> status.equalsIgnoreCase(o.getStatus()))
                     .toList();
         }
 
-        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            Sheet sheet = workbook.createSheet("Danh Sách Đơn Hàng");
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Danh sách đơn hàng");
 
-            // Header Style
             Font headerFont = workbook.createFont();
             headerFont.setBold(true);
             headerFont.setColor(IndexedColors.WHITE.getIndex());
@@ -172,17 +181,15 @@ public class OrderExportServiceImpl implements OrderExportService {
             CellStyle headerCellStyle = workbook.createCellStyle();
             headerCellStyle.setFont(headerFont);
             headerCellStyle.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
-            headerCellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-            headerCellStyle.setAlignment(HorizontalAlignment.CENTER);
+            headerCellStyle.setFillPattern(org.apache.poi.ss.usermodel.FillPatternType.SOLID_FOREGROUND);
 
-            // Date & Currency Format
             CellStyle currencyStyle = workbook.createCellStyle();
-            DataFormat dataFormat = workbook.createDataFormat();
-            currencyStyle.setDataFormat(dataFormat.getFormat("#,##0"));
+            currencyStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0"));
 
-            String[] columns = {"Mã Đơn Hàng", "Mã Khách Hàng", "Trạng Thái", "PT Thanh Toán",
-                    "TT Thanh Toán", "Tạm Tính", "Phí Vận Chuyển", "Giảm Giá", "Tổng Tiền",
-                    "Mã Coupon", "Ngày Tạo"};
+            String[] columns = {
+                    "Mã đơn hàng", "Mã khách hàng", "Trạng thái", "Phương thức TT", "Trạng thái TT",
+                    "Tạm tính", "Phí ship", "Giảm giá", "Tổng tiền", "Mã Coupon", "Ngày tạo"
+            };
 
             Row headerRow = sheet.createRow(0);
             for (int col = 0; col < columns.length; col++) {
@@ -265,7 +272,7 @@ public class OrderExportServiceImpl implements OrderExportService {
         long distinctUsers = orderRepository.countDistinctUserId();
         long totalCustomers = Math.max(distinctUsers, 3L);
 
-        // 3. Revenue by Date (last 7 days)
+        // 3. Revenue by Date (last 7 days - CHỈ tính đơn thành công / đã thanh toán, không tính đơn hủy)
         LocalDate today = LocalDate.now();
         LocalDateTime sevenDaysAgo = today.minusDays(6).atStartOfDay();
         List<Order> last7DaysOrders = orderRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(sevenDaysAgo, LocalDateTime.now());
@@ -275,6 +282,10 @@ public class OrderExportServiceImpl implements OrderExportService {
             LocalDate d = today.minusDays(i);
             BigDecimal dayAmount = last7DaysOrders.stream()
                     .filter(o -> o.getCreatedAt() != null && o.getCreatedAt().toLocalDate().equals(d))
+                    .filter(o -> !"CANCELLED".equalsIgnoreCase(o.getStatus()) && !"RETURNED".equalsIgnoreCase(o.getStatus()))
+                    .filter(o -> "PAID".equalsIgnoreCase(o.getPaymentStatus())
+                            || "DELIVERED".equalsIgnoreCase(o.getStatus())
+                            || "COMPLETED".equalsIgnoreCase(o.getStatus()))
                     .map(Order::getTotalAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             revenueByDate.add(new DashboardStatsResponse.RevenueByDateDto(d.format(dateFmt), dayAmount));
@@ -300,5 +311,12 @@ public class OrderExportServiceImpl implements OrderExportService {
                 .topProducts(topProducts)
                 .recentOrders(recentOrders)
                 .build();
+    }
+
+    private String stripAccents(String s) {
+        if (s == null) return "";
+        String temp = Normalizer.normalize(s, Normalizer.Form.NFD);
+        return Pattern.compile("\\p{InCombiningDiacriticalMarks}+").matcher(temp).replaceAll("")
+                .replace("Đ", "D").replace("đ", "d");
     }
 }

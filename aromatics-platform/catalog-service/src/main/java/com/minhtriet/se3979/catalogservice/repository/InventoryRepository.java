@@ -22,6 +22,10 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     @Query("SELECT i FROM Inventory i WHERE i.variant.id = :variantId")
     Optional<Inventory> findByVariantIdWithLock(@Param("variantId") Long variantId);
 
+    // Truy vấn hàng loạt tồn kho theo danh sách variant IDs để chống N+1 queries
+    @Query("SELECT i FROM Inventory i WHERE i.variant.id IN :variantIds")
+    List<Inventory> findByVariantIdIn(@Param("variantIds") List<Long> variantIds);
+
     // Tìm các mặt hàng sắp hết hàng (quantity <= lowStockThreshold)
     @Query("SELECT i FROM Inventory i JOIN FETCH i.variant v JOIN FETCH v.product p WHERE i.quantity <= i.lowStockThreshold ORDER BY i.quantity ASC")
     List<Inventory> findLowStockInventories();

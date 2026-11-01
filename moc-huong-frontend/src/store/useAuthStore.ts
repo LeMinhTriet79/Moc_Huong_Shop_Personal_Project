@@ -28,17 +28,23 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
 
       login: (authData: AuthResponse) => {
+        const raw = authData as any;
+        const resolvedRole: UserRole = authData.role || raw.user?.role || 'CUSTOMER';
+        const userId = authData.userId || raw.user?.id || raw.id;
+        const email = authData.email || raw.user?.email || raw.email || '';
+        const fullName = authData.fullName || raw.user?.fullName || raw.fullName || '';
+
         set({
           accessToken: authData.accessToken,
           refreshToken: authData.refreshToken,
-          role: authData.role,
+          role: resolvedRole,
           isAuthenticated: true,
           user: {
-            id: authData.userId,
-            email: authData.email,
-            fullName: authData.fullName,
-            role: authData.role,
-            provider: 'LOCAL',
+            id: userId,
+            email: email,
+            fullName: fullName,
+            role: resolvedRole,
+            provider: raw.user?.provider || 'LOCAL',
             isEmailVerified: true,
             isActive: true,
             createdAt: new Date().toISOString(),

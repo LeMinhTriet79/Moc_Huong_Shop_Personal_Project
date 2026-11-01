@@ -5,19 +5,23 @@ import com.minhtriet.se3979.orderservice.repository.CouponRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Slf4j
 @Component
+@Profile("!test")
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {
 
     private final CouponRepository couponRepository;
 
     @Override
+    @Transactional
     public void run(String... args) {
         if (couponRepository.count() == 0) {
             log.info("🌱 Đang khởi tạo dữ liệu mẫu 3 mã giảm giá cho Mộc Hương Shop...");

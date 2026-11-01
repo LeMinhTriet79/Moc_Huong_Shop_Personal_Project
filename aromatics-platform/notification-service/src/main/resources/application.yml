@@ -4,23 +4,24 @@ server:
 management:
   tracing:
     sampling:
-      probability: 1.0 # 1.0 nghĩa là ghi hình 100% các request (để test)
+      probability: 1.0
+
 spring:
   zipkin:
-    base-url: http://localhost:9411
+    base-url: ${MANAGEMENT_ZIPKIN_TRACING_ENDPOINT:http://localhost:9411}
   application:
     name: notification-service
 
   # Cấu hình kết nối MySQL
   datasource:
-    url: jdbc:mysql://localhost:3306/notification_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
-    username: root
-    password: 12345
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/notification_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:12345}
 
   # Cấu hình JPA & Hibernate
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate.dialect: org.hibernate.dialect.MySQLDialect
@@ -28,15 +29,13 @@ spring:
   # Cấu hình Redis
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
 
   # Cấu hình Kafka Consumer
-  # Cấu hình Kafka Consumer
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
-      # Đổi sang v3 để bỏ qua cái tin nhắn lỗi đang bị kẹt
       group-id: notification-group-v3
       auto-offset-reset: latest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -44,29 +43,32 @@ spring:
       properties:
         spring.json.trusted.packages: "*"
         spring.json.value.default.type: java.util.HashMap
-        # BÍ QUYẾT GIẢI QUYẾT LỖI CLASS NOT FOUND: Phớt lờ nhãn mác của bên gửi
         spring.json.use.type.headers: false
     listener:
       observation-enabled: true
 
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: "letriet22042004@gmail.com"
-    password: "fzctnhjqphtvudbw"
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:letriet22042004@gmail.com}
+    password: ${MAIL_PASSWORD:fzctnhjqphtvudbw}
     properties:
       mail:
         smtp:
           auth: true
           starttls:
             enable: true
+
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}
 
 # Cấu hình JWT
 jwt:
-  secret: 4b6a4a6e744e6b726466384a51356f5a774652417757367838536b5952674261
-  expiration: 900000
-  refresh-expiration: 604800000
+  secret: ${JWT_SECRET:4b6a4a6e744e6b726466384a51356f5a774652417757367838536b5952674261}
+  expiration: ${JWT_EXPIRATION:900000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+
+app:
+  internal-secret: ${APP_INTERNAL_SECRET:MocHuongSecretKey2026InternalAuth}

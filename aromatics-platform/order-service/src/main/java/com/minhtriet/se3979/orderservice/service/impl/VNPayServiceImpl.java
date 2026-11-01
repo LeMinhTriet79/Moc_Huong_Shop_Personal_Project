@@ -1,27 +1,29 @@
-package com.minhtriet.se3979.orderservice.vnpay;
+package com.minhtriet.se3979.orderservice.service.impl;
 
-import com.minhtriet.se3979.orderservice.dto.response.ApiResponse;
 import com.minhtriet.se3979.orderservice.entity.Order;
+import com.minhtriet.se3979.orderservice.exception.AppException;
 import com.minhtriet.se3979.orderservice.repository.OrderRepository;
 import com.minhtriet.se3979.orderservice.service.OrderService;
-import jakarta.servlet.http.HttpServletRequest;
+import com.minhtriet.se3979.orderservice.service.VNPayService;
+import com.minhtriet.se3979.orderservice.vnpay.VNPayUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Slf4j
-@RestController
-@RequestMapping("/api/order/payment")
+@Service
 @RequiredArgsConstructor
-public class PaymentController {
+public class VNPayServiceImpl implements VNPayService {
 
     private final OrderRepository orderRepository;
     private final OrderService orderService;
@@ -38,32 +40,18 @@ public class PaymentController {
     @Value("${vnpay.return-url}")
     private String vnp_ReturnUrl;
 
-    // 1. API Tạo Link Thanh Toán
-    @GetMapping("/create-url/{orderId}")
-    public ResponseEntity<ApiResponse<Map<String, String>>> createPaymentUrl(
-            @PathVariable Long orderId, HttpServletRequest request) {
-        return buildVNPayUrl(orderId, null, null, request);
-    }
+    private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+    private static final DateTimeFormatter VNPAY_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
-    @GetMapping("/create-payment")
-    public ResponseEntity<ApiResponse<Map<String, String>>> createPayment(
-            @RequestParam(required = false) Long orderId,
-            @RequestParam(required = false) BigDecimal amount,
-            @RequestParam(required = false) String orderInfo,
-            HttpServletRequest request) {
-        return buildVNPayUrl(orderId, amount, orderInfo, request);
-    }
-
-    private ResponseEntity<ApiResponse<Map<String, String>>> buildVNPayUrl(
-            Long orderId, BigDecimal amountParam, String orderInfoParam, HttpServletRequest request) {
-
+    @Override
+    public String createPaymentUrl(Long orderId, BigDecimal amountParam, String orderInfoParam, String ipAddress) {
         String txnRef;
         long amountVal;
         String info;
 
         if (orderId != null) {
             Order order = orderRepository.findById(orderId)
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng với id: " + orderId));
             txnRef = order.getOrderCode();
             BigDecimal actualAmount = (amountParam != null && amountParam.compareTo(BigDecimal.ZERO) > 0)
                     ? amountParam : order.getTotalAmount();
@@ -79,12 +67,13 @@ public class PaymentController {
                     ? orderInfoParam : "Thanh toan don hang " + txnRef;
         }
 
-        String vnp_Version = "2.1.0";
-        String vnp_Command = "pay";
+        ZonedDateTime now = ZonedDateTime.now(VN_ZONE);
+        String vnp_CreateDate = now.format(VNPAY_DATE_FORMATTER);
+        String vnp_ExpireDate = now.plusMinutes(15).format(VNPAY_DATE_FORMATTER);
 
         Map<String, String> vnp_Params = new HashMap<>();
-        vnp_Params.put("vnp_Version", vnp_Version);
-        vnp_Params.put("vnp_Command", vnp_Command);
+        vnp_Params.put("vnp_Version", "2.1.0");
+        vnp_Params.put("vnp_Command", "pay");
         vnp_Params.put("vnp_TmnCode", vnp_TmnCode);
         vnp_Params.put("vnp_Amount", String.valueOf(amountVal));
         vnp_Params.put("vnp_CurrCode", "VND");
@@ -93,22 +82,15 @@ public class PaymentController {
         vnp_Params.put("vnp_OrderType", "other");
         vnp_Params.put("vnp_Locale", "vn");
         vnp_Params.put("vnp_ReturnUrl", vnp_ReturnUrl);
-        vnp_Params.put("vnp_IpAddr", VNPayUtil.getIpAddress(request));
-
-        Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Etc/GMT+7"));
-        SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
-        String vnp_CreateDate = formatter.format(cld.getTime());
+        vnp_Params.put("vnp_IpAddr", (ipAddress != null && !ipAddress.isBlank()) ? ipAddress : "127.0.0.1");
         vnp_Params.put("vnp_CreateDate", vnp_CreateDate);
-
-        // Hết hạn sau 15 phút
-        cld.add(Calendar.MINUTE, 15);
-        String vnp_ExpireDate = formatter.format(cld.getTime());
         vnp_Params.put("vnp_ExpireDate", vnp_ExpireDate);
 
         List<String> fieldNames = new ArrayList<>(vnp_Params.keySet());
         Collections.sort(fieldNames);
         StringBuilder hashData = new StringBuilder();
         StringBuilder query = new StringBuilder();
+
         Iterator<String> itr = fieldNames.iterator();
         while (itr.hasNext()) {
             String fieldName = itr.next();
@@ -127,33 +109,21 @@ public class PaymentController {
                 }
             }
         }
+
         String queryUrl = query.toString();
         String vnp_SecureHash = VNPayUtil.hmacSHA512(secretKey, hashData.toString());
         queryUrl += "&vnp_SecureHash=" + vnp_SecureHash;
-        String paymentUrl = vnp_PayUrl + "?" + queryUrl;
 
-        return ResponseEntity.ok(ApiResponse.success(
-                Map.of("paymentUrl", paymentUrl), "Tạo link thanh toán VNPay thành công"));
+        return vnp_PayUrl + "?" + queryUrl;
     }
 
-    // 2. API Nhận Kết Quả Trả Về Từ VNPay
-    @GetMapping("/vnpay-return")
-    public ResponseEntity<ApiResponse<String>> vnpayReturn(HttpServletRequest request) {
-        Map<String, String> fields = new HashMap<>();
-        Map<String, Object> rawResponse = new HashMap<>();
+    @Override
+    public Map<String, Object> processReturn(Map<String, String> requestParams) {
+        Map<String, String> fields = new HashMap<>(requestParams);
+        Map<String, Object> rawResponse = new HashMap<>(requestParams);
 
-        for (Enumeration<String> params = request.getParameterNames(); params.hasMoreElements(); ) {
-            String fieldName = params.nextElement();
-            String fieldValue = request.getParameter(fieldName);
-            if ((fieldValue != null) && (!fieldValue.isEmpty())) {
-                fields.put(fieldName, fieldValue);
-                rawResponse.put(fieldName, fieldValue);
-            }
-        }
-
-        String vnp_SecureHash = request.getParameter("vnp_SecureHash");
+        String vnp_SecureHash = fields.remove("vnp_SecureHash");
         fields.remove("vnp_SecureHashType");
-        fields.remove("vnp_SecureHash");
 
         List<String> fieldNames = new ArrayList<>(fields.keySet());
         Collections.sort(fieldNames);
@@ -171,31 +141,38 @@ public class PaymentController {
                 }
             }
         }
+
         String signValue = VNPayUtil.hmacSHA512(secretKey, hashData.toString());
+        if (!signValue.equalsIgnoreCase(vnp_SecureHash)) {
+            return Map.of("success", false, "message", "Chữ ký không hợp lệ!");
+        }
 
-        if (signValue.equals(vnp_SecureHash)) {
-            String orderCode = request.getParameter("vnp_TxnRef");
-            String responseCode = request.getParameter("vnp_ResponseCode");
-            String transactionNo = request.getParameter("vnp_TransactionNo");
-            String transactionCode = "TXN-" + orderCode;
-            String amountStr = request.getParameter("vnp_Amount");
-            BigDecimal amount = amountStr != null ? new BigDecimal(amountStr).divide(BigDecimal.valueOf(100)) : BigDecimal.ZERO;
+        String orderCode = requestParams.get("vnp_TxnRef");
+        String responseCode = requestParams.get("vnp_ResponseCode");
+        String transactionNo = requestParams.get("vnp_TransactionNo");
+        String transactionCode = "TXN-" + orderCode;
+        String amountStr = requestParams.get("vnp_Amount");
+        BigDecimal amount = amountStr != null
+                ? new BigDecimal(amountStr).divide(BigDecimal.valueOf(100))
+                : BigDecimal.ZERO;
 
-            if ("00".equals(responseCode)) {
-                // THANH TOÁN THÀNH CÔNG
-                orderService.handlePaymentSuccess(
-                        orderCode, transactionCode, transactionNo, amount, responseCode, "Thành công", rawResponse);
-                return ResponseEntity.ok(ApiResponse.success(
-                        "Giao dịch thành công! Mã đơn: " + orderCode, "Thanh toán thành công"));
-            } else {
-                // THANH TOÁN THẤT BẠI / BỊ HỦY -> TỰ ĐỘNG CHUYỂN CANCELLED & HOÀN KHO
-                orderService.handlePaymentFailure(
-                        orderCode, transactionCode, transactionNo, amount, responseCode, "Giao dịch không thành công", rawResponse);
-                return ResponseEntity.badRequest().body(ApiResponse.error(
-                        "Giao dịch thất bại hoặc bị hủy (Code: " + responseCode + ")"));
-            }
+        if ("00".equals(responseCode)) {
+            orderService.handlePaymentSuccess(
+                    orderCode, transactionCode, transactionNo, amount, responseCode, "Thành công", rawResponse);
+            return Map.of(
+                    "success", true,
+                    "orderCode", orderCode,
+                    "message", "Giao dịch thành công! Mã đơn: " + orderCode
+            );
         } else {
-            return ResponseEntity.badRequest().body(ApiResponse.error("Chữ ký không hợp lệ!"));
+            orderService.handlePaymentFailure(
+                    orderCode, transactionCode, transactionNo, amount, responseCode, "Giao dịch không thành công", rawResponse);
+            return Map.of(
+                    "success", false,
+                    "orderCode", orderCode,
+                    "responseCode", responseCode,
+                    "message", "Giao dịch thất bại hoặc bị hủy (Code: " + responseCode + ")"
+            );
         }
     }
 }

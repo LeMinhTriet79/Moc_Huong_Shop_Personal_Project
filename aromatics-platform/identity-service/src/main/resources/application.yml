@@ -7,17 +7,16 @@ management:
       probability: 1.0
 
 spring:
-  # Chú ý: chữ spring này phải nằm sát lề trái, đừng thụt vào trong
   zipkin:
-    base-url: http://localhost:9411
+    base-url: ${MANAGEMENT_ZIPKIN_TRACING_ENDPOINT:http://localhost:9411}
   application:
     name: identity-service
 
   # Cấu hình kết nối MySQL
   datasource:
-    url: jdbc:mysql://localhost:3306/identity_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
-    username: root
-    password: 12345
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/identity_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:12345}
 
   # Cấu hình JPA & Hibernate
   jpa:
@@ -30,18 +29,19 @@ spring:
   # Cấu hình Redis
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
 
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}
 
 # Cấu hình JWT
 jwt:
-  # Chữ ký bí mật (Đã mã hóa Base64). Chuỗi này ít nhất phải 256-bit (tương đương 32 ký tự).
-  secret: 4b6a4a6e744e6b726466384a51356f5a774652417757367838536b5952674261
-  # Thời hạn Access Token tính bằng mili-giây (15 phút = 900000)
-  expiration: 900000
-  refresh-expiration: 604800000
+  secret: ${JWT_SECRET:4b6a4a6e744e6b726466384a51356f5a774652417757367838536b5952674261}
+  expiration: ${JWT_EXPIRATION:900000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+
+app:
+  internal-secret: ${APP_INTERNAL_SECRET:MocHuongSecretKey2026InternalAuth}

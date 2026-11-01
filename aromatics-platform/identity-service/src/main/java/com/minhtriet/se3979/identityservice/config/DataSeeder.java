@@ -10,9 +10,11 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
+@Profile("!test")
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {
 
@@ -20,6 +22,7 @@ public class DataSeeder implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
 
     @Override
+    @Transactional
     public void run(String... args) {
         if (userRepository.count() == 0) {
             log.info("🌱 Đang khởi tạo dữ liệu mẫu 3 tài khoản cho Mộc Hương Shop...");

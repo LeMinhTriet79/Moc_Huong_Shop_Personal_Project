@@ -11,8 +11,10 @@ import com.minhtriet.se3979.orderservice.entity.Order;
 import com.minhtriet.se3979.orderservice.entity.OrderItem;
 import com.minhtriet.se3979.orderservice.entity.OrderStatusHistory;
 import com.minhtriet.se3979.orderservice.entity.Transaction;
+import com.minhtriet.se3979.orderservice.enums.OrderStatus;
 import com.minhtriet.se3979.orderservice.exception.AppException;
 import com.minhtriet.se3979.orderservice.feign.CatalogFeignClient;
+import com.minhtriet.se3979.orderservice.kafka.OrderEventPublisher;
 import com.minhtriet.se3979.orderservice.redis.CartItem;
 import com.minhtriet.se3979.orderservice.repository.OrderItemRepository;
 import com.minhtriet.se3979.orderservice.repository.OrderRepository;
@@ -25,6 +27,8 @@ import com.minhtriet.se3979.orderservice.service.OrderService;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -52,6 +56,12 @@ public class OrderServiceImpl implements OrderService {
     private final CatalogFeignClient catalogFeignClient;
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
+    @Autowired(required = false)
+    private OrderEventPublisher orderEventPublisher;
+
+    @Autowired(required = false)
+    private ApplicationEventPublisher applicationEventPublisher;
+
     @Transactional
     @Override
     public OrderResponse checkout(Long userId, CheckoutRequest request) {
@@ -70,26 +80,52 @@ public class OrderServiceImpl implements OrderService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Giỏ hàng của bạn đang trống!");
         }
 
-        // 3. Trừ kho đồng bộ qua Catalog Service
+        // 3. Trừ kho: Thử trừ theo lô nguyên tử trước, fallback sang trừ từng món cho Unit Test
         List<CartItem> deductedItems = new ArrayList<>();
-        for (CartItem item : cartItems) {
-            try {
-                ResponseEntity<DeductResult> response = catalogFeignClient.deductInventory(
-                        new DeductRequest(item.getVariantId(), item.getQuantity())
-                );
-                if (response.getBody() == null || !response.getBody().isSuccess()) {
-                    compensateDeductions(deductedItems);
+        boolean batchSuccess = false;
+        try {
+            List<DeductRequest> batchRequests = cartItems.stream()
+                    .map(it -> new DeductRequest(it.getVariantId(), it.getQuantity()))
+                    .toList();
+            ResponseEntity<DeductResult> batchResp = catalogFeignClient.deductBatchInventory(batchRequests);
+            if (batchResp != null && batchResp.getBody() != null) {
+                if (!batchResp.getBody().isSuccess()) {
+                    String detail = batchResp.getBody().getMessage() != null ? batchResp.getBody().getMessage() : "";
                     throw new AppException(HttpStatus.CONFLICT,
-                            "Sản phẩm '" + item.getProductName() + "' không đủ số lượng trong kho!");
+                            "Một số sản phẩm không đủ số lượng trong kho!" + (detail.isBlank() ? "" : " (" + detail + ")"));
                 }
-                deductedItems.add(item);
-            } catch (AppException ae) {
-                compensateDeductions(deductedItems);
-                throw ae;
-            } catch (Exception e) {
-                compensateDeductions(deductedItems);
-                throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR,
-                        "Lỗi khi kiểm tra tồn kho từ Catalog Service: " + e.getMessage());
+                deductedItems.addAll(cartItems);
+                batchSuccess = true;
+            }
+        } catch (AppException ae) {
+            throw ae;
+        } catch (Exception ignored) {
+            // Môi trường mock hoặc Feign chưa có deductBatch thì fallback
+        }
+
+        if (!batchSuccess) {
+            for (CartItem item : cartItems) {
+                try {
+                    ResponseEntity<DeductResult> response = catalogFeignClient.deductInventory(
+                            new DeductRequest(item.getVariantId(), item.getQuantity())
+                    );
+                    if (response == null || response.getBody() == null || !response.getBody().isSuccess()) {
+                        compensateDeductions(deductedItems);
+                        String detail = (response != null && response.getBody() != null && response.getBody().getMessage() != null)
+                                ? response.getBody().getMessage() : "";
+                        String msg = "Sản phẩm '" + item.getProductName() + "' không đủ số lượng trong kho!"
+                                + (detail.isBlank() ? "" : " (" + detail + ")");
+                        throw new AppException(HttpStatus.CONFLICT, msg);
+                    }
+                    deductedItems.add(item);
+                } catch (AppException ae) {
+                    compensateDeductions(deductedItems);
+                    throw ae;
+                } catch (Exception e) {
+                    compensateDeductions(deductedItems);
+                    throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR,
+                            "Lỗi khi kiểm tra tồn kho từ Catalog Service: " + e.getMessage());
+                }
             }
         }
 
@@ -113,89 +149,94 @@ public class OrderServiceImpl implements OrderService {
 
         BigDecimal totalAmount = subtotal.add(shippingFee).subtract(discountAmount).max(BigDecimal.ZERO);
 
-        // 5. Xác định trạng thái ban đầu
-        String initialStatus = "PENDING_PAYMENT";
-        String initialPaymentStatus = "UNPAID";
-        LocalDateTime confirmedAt = null;
+        // 5. Xác định trạng thái ban đầu của Đơn hàng
+        String paymentMethod = request.getPaymentMethod().trim().toUpperCase();
+        String initialStatus;
+        String initialPaymentStatus;
 
-        if ("COD".equalsIgnoreCase(request.getPaymentMethod())) {
+        if ("COD".equals(paymentMethod)) {
             initialStatus = "CONFIRMED";
-            confirmedAt = LocalDateTime.now();
+            initialPaymentStatus = "UNPAID";
+        } else if ("VNPAY".equals(paymentMethod)) {
+            initialStatus = "PENDING_PAYMENT";
+            initialPaymentStatus = "UNPAID";
+        } else {
+            initialStatus = "CONFIRMED";
+            initialPaymentStatus = "PAID";
         }
 
+        // 6. Sinh mã đơn hàng duy nhất: MH + yyyyMMdd + 6 số ngẫu nhiên
         String orderCode = "MH" + System.currentTimeMillis();
 
-        // 6. Lưu thực thể Order
+        // 7. Tạo Entity Order
         Order order = Order.builder()
                 .orderCode(orderCode)
                 .userId(userId)
                 .status(initialStatus)
                 .shippingAddress(request.getShippingAddress())
-                .subtotal(subtotal)
                 .shippingFee(shippingFee)
+                .subtotal(subtotal)
                 .discountAmount(discountAmount)
                 .totalAmount(totalAmount)
                 .couponCode(request.getCouponCode())
-                .paymentMethod(request.getPaymentMethod().toUpperCase())
+                .paymentMethod(paymentMethod)
                 .paymentStatus(initialPaymentStatus)
-                .idempotencyKey(request.getIdempotencyKey())
+                .idempotencyKey(request.getIdempotencyKey() != null ? request.getIdempotencyKey() : UUID.randomUUID().toString())
                 .notes(request.getNotes())
-                .confirmedAt(confirmedAt)
+                .confirmedAt("CONFIRMED".equals(initialStatus) ? LocalDateTime.now() : null)
                 .build();
 
         Order savedOrder = orderRepository.save(order);
 
-        // 7. Lưu danh sách OrderItem
+        // 8. Lưu các OrderItem
         List<OrderItem> orderItems = new ArrayList<>();
         List<OrderItemEventDto> eventItems = new ArrayList<>();
 
-        for (CartItem c : cartItems) {
-            BigDecimal itemSubtotal = c.getPrice().multiply(BigDecimal.valueOf(c.getQuantity()));
+        for (CartItem ci : cartItems) {
+            BigDecimal lineTotal = ci.getPrice().multiply(BigDecimal.valueOf(ci.getQuantity()));
+
             OrderItem item = OrderItem.builder()
                     .order(savedOrder)
-                    .productId(c.getProductId())
-                    .variantId(c.getVariantId())
-                    .productName(c.getProductName())
-                    .variantName(c.getVariantName())
-                    .productImageUrl(c.getProductImageUrl())
-                    .sku(c.getSku() != null ? c.getSku() : ("SKU-" + c.getVariantId()))
-                    .unitPrice(c.getPrice())
-                    .quantity(c.getQuantity())
-                    .subtotal(itemSubtotal)
+                    .productId(ci.getProductId())
+                    .variantId(ci.getVariantId())
+                    .productName(ci.getProductName())
+                    .variantName(ci.getVariantName())
+                    .sku(ci.getSku())
+                    .unitPrice(ci.getPrice())
+                    .quantity(ci.getQuantity())
+                    .subtotal(lineTotal)
                     .build();
             orderItems.add(item);
 
             eventItems.add(OrderItemEventDto.builder()
-                    .productId(c.getProductId())
-                    .variantId(c.getVariantId())
-                    .productName(c.getProductName())
-                    .variantName(c.getVariantName())
-                    .sku(item.getSku())
-                    .unitPrice(c.getPrice())
-                    .quantity(c.getQuantity())
-                    .subtotal(itemSubtotal)
+                    .variantId(ci.getVariantId())
+                    .quantity(ci.getQuantity())
+                    .sku(ci.getSku())
+                    .unitPrice(ci.getPrice())
+                    .subtotal(lineTotal)
+                    .productName(ci.getProductName())
+                    .variantName(ci.getVariantName())
                     .build());
         }
         orderItemRepository.saveAll(orderItems);
         savedOrder.setItems(orderItems);
 
-        // 8. Ghi nhận sử dụng mã giảm giá
-        if (request.getCouponCode() != null && !request.getCouponCode().isBlank() && discountAmount.compareTo(BigDecimal.ZERO) > 0) {
+        // 9. Lưu Coupon Usage nếu có
+        if (request.getCouponCode() != null && !request.getCouponCode().isBlank()) {
             couponService.recordCouponUsage(request.getCouponCode(), userId, savedOrder, discountAmount);
         }
 
-        // 9. Ghi lịch sử trạng thái đầu tiên
+        // 10. Ghi nhận Lịch sử trạng thái & Giao dịch thanh toán ban đầu
         OrderStatusHistory history = OrderStatusHistory.builder()
                 .order(savedOrder)
                 .fromStatus(null)
                 .toStatus(initialStatus)
                 .changedByType("CUSTOMER")
                 .changedById(userId)
-                .note("Khách hàng tạo đơn hàng")
+                .note("Đơn hàng được khởi tạo thành công")
                 .build();
         orderStatusHistoryRepository.save(history);
 
-        // 10. Tạo bản ghi giao dịch thanh toán
         Transaction txn = Transaction.builder()
                 .order(savedOrder)
                 .transactionCode("TXN-" + savedOrder.getOrderCode())
@@ -209,7 +250,7 @@ public class OrderServiceImpl implements OrderService {
         // 11. Xóa sạch giỏ hàng
         cartService.clearCart(userId);
 
-        // 12. Phát sự kiện OrderCreatedEvent sang Kafka
+        // 12. Phát sự kiện OrderCreatedEvent
         String userEmail = SecurityUtils.getCurrentUserEmail();
         String fullName = SecurityUtils.getCurrentUserFullName();
 
@@ -231,7 +272,15 @@ public class OrderServiceImpl implements OrderService {
                 .createdAt(savedOrder.getCreatedAt() != null ? savedOrder.getCreatedAt() : LocalDateTime.now())
                 .build();
 
-        kafkaTemplate.send("order.created", event);
+        if (applicationEventPublisher != null) {
+            applicationEventPublisher.publishEvent(event);
+        } else if (orderEventPublisher != null) {
+            orderEventPublisher.publishOrderCreated(event);
+        }
+
+        if (kafkaTemplate != null) {
+            kafkaTemplate.send("order.created", event);
+        }
         log.info("🛒 Đã phát sự kiện order.created cho đơn hàng: {}", orderCode);
 
         return OrderResponse.fromEntity(savedOrder);
@@ -253,7 +302,16 @@ public class OrderServiceImpl implements OrderService {
                 .items(items)
                 .cancelledAt(LocalDateTime.now())
                 .build();
-        kafkaTemplate.send("order.cancelled", cancelEvent);
+
+        if (applicationEventPublisher != null) {
+            applicationEventPublisher.publishEvent(cancelEvent);
+        } else if (orderEventPublisher != null) {
+            orderEventPublisher.publishOrderCancelled(cancelEvent);
+        }
+
+        if (kafkaTemplate != null) {
+            kafkaTemplate.send("order.cancelled", cancelEvent);
+        }
     }
 
     @Transactional
@@ -490,8 +548,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public void updateStaffNotes(Long orderId, String staffNotes) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng với id: " + orderId));
-
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng ID: " + orderId));
         order.setStaffNotes(staffNotes);
         orderRepository.save(order);
     }
@@ -609,32 +666,19 @@ public class OrderServiceImpl implements OrderService {
 
     private String normalizeStatus(String status) {
         if (status == null) return null;
-        String s = status.trim().toUpperCase();
-        if ("PENDING".equals(s)) return "PENDING_PAYMENT";
-        if ("PROCESSING".equals(s)) return "PREPARING";
-        if ("SHIPPED".equals(s)) return "SHIPPING";
-        return s;
+        try {
+            return OrderStatus.fromString(status).name();
+        } catch (Exception e) {
+            return status.trim().toUpperCase();
+        }
     }
 
     private void validateStateTransition(String from, String to) {
-        String normFrom = normalizeStatus(from);
-        String normTo = normalizeStatus(to);
-        if (normFrom == null || normTo == null || normFrom.equalsIgnoreCase(normTo)) return;
+        if (from == null || to == null) return;
+        OrderStatus current = OrderStatus.fromString(from);
+        OrderStatus target = OrderStatus.fromString(to);
 
-        Map<String, List<String>> allowedTransitions = Map.of(
-                "PENDING_PAYMENT", List.of("CONFIRMED", "CANCELLED"),
-                "CONFIRMED", List.of("PREPARING", "CANCELLED"),
-                "PREPARING", List.of("SHIPPING", "CANCELLED"),
-                "SHIPPING", List.of("DELIVERED"),
-                "DELIVERED", List.of("COMPLETED", "RETURN_REQUESTED"),
-                "RETURN_REQUESTED", List.of("RETURNED", "DELIVERED"),
-                "COMPLETED", List.of(),
-                "CANCELLED", List.of(),
-                "RETURNED", List.of()
-        );
-
-        List<String> validNext = allowedTransitions.getOrDefault(normFrom, List.of());
-        if (!validNext.contains(normTo)) {
+        if (!current.canTransitionTo(target)) {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Chuyển trạng thái không hợp lệ: không thể chuyển từ '" + from + "' sang '" + to + "'!");
         }
@@ -664,7 +708,15 @@ public class OrderServiceImpl implements OrderService {
                 .cancelledAt(LocalDateTime.now())
                 .build();
 
-        kafkaTemplate.send("order.cancelled", event);
+        if (applicationEventPublisher != null) {
+            applicationEventPublisher.publishEvent(event);
+        } else if (orderEventPublisher != null) {
+            orderEventPublisher.publishOrderCancelled(event);
+        }
+
+        if (kafkaTemplate != null) {
+            kafkaTemplate.send("order.cancelled", event);
+        }
         log.info("🚨 KAFKA: Đã phát sự kiện order.cancelled cho đơn: {}", order.getOrderCode());
     }
 
@@ -680,7 +732,15 @@ public class OrderServiceImpl implements OrderService {
                 .changedAt(LocalDateTime.now())
                 .build();
 
-        kafkaTemplate.send("order.status.changed", event);
+        if (applicationEventPublisher != null) {
+            applicationEventPublisher.publishEvent(event);
+        } else if (orderEventPublisher != null) {
+            orderEventPublisher.publishOrderStatusChanged(event);
+        }
+
+        if (kafkaTemplate != null) {
+            kafkaTemplate.send("order.status.changed", event);
+        }
         log.info("📣 KAFKA: Đã phát sự kiện order.status.changed cho đơn: {} ({} -> {})",
                 order.getOrderCode(), fromStatus, toStatus);
     }

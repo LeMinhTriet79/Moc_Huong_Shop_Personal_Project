@@ -8,6 +8,7 @@ import com.minhtriet.se3979.catalogservice.exception.AppException;
 import com.minhtriet.se3979.catalogservice.security.SecurityUtils;
 import com.minhtriet.se3979.catalogservice.service.ReviewService;
 import jakarta.validation.Valid;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -28,6 +29,7 @@ public class ReviewController {
 
     private final ReviewService reviewService;
     private final ObjectMapper objectMapper;
+    private final Validator validator;
 
     /**
      * API 1A: ĐĂNG ĐÁNH GIÁ MỚI QUA JSON (Frontend: POST /api/catalog/reviews)
@@ -51,6 +53,12 @@ public class ReviewController {
         try {
             Long userId = SecurityUtils.getCurrentUserId();
             ReviewCreateRequest request = objectMapper.readValue(reviewJson, ReviewCreateRequest.class);
+
+            var violations = validator.validate(request);
+            if (!violations.isEmpty()) {
+                throw new AppException(HttpStatus.BAD_REQUEST, violations.iterator().next().getMessage());
+            }
+
             ReviewResponse response = reviewService.createReview(productId, userId, request, files);
             return ResponseEntity.ok(ApiResponse.success(response, "Đăng đánh giá thành công"));
         } catch (AppException ae) {
@@ -78,7 +86,7 @@ public class ReviewController {
     // ==========================================
 
     @PutMapping({"/products/{productId}/reviews/{reviewId}", "/reviews/{reviewId}"})
-    public ResponseEntity<ApiResponse<Object>> updateReview(
+    public ResponseEntity<ApiResponse<ReviewResponse>> updateReview(
             @PathVariable(required = false) Long productId,
             @PathVariable Long reviewId,
             @RequestParam(required = false) Integer rating,
@@ -96,7 +104,7 @@ public class ReviewController {
                 if (c == null) c = (String) body.get("comment");
             }
         }
-        Object updated = reviewService.updateReview(reviewId, userId, r, c);
+        ReviewResponse updated = reviewService.updateReview(reviewId, userId, r, c);
         return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật đánh giá thành công"));
     }
 

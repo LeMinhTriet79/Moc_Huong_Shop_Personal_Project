@@ -4,58 +4,57 @@ server:
 management:
   tracing:
     sampling:
-      probability: 1.0 # 1.0 nghĩa là ghi hình 100% các request (để test)
+      probability: 1.0
+
 spring:
   zipkin:
-    base-url: http://localhost:9411
+    base-url: ${MANAGEMENT_ZIPKIN_TRACING_ENDPOINT:http://localhost:9411}
   application:
     name: catalog-service
 
   datasource:
-    url: jdbc:mysql://localhost:3306/catalog_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
-    username: root
-    password: 12345
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/catalog_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:12345}
 
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate.dialect: org.hibernate.dialect.MySQLDialect
 
   data:
     redis:
-      host: localhost
-      port: 6379
-  # Thêm khối kafka này vào cùng cấp độ thụt lề với datasource, jpa, data
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       group-id: catalog-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-
       properties:
         spring.json.trusted.packages: "*"
         spring.json.value.default.type: java.util.HashMap
     listener:
       observation-enabled: true
+
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}
 
 # Cấu hình JWT
 jwt:
-  # Chữ ký bí mật (Đã mã hóa Base64). Chuỗi này ít nhất phải 256-bit (tương đương 32 ký tự).
-  secret: 4b6a4a6e744e6b726466384a51356f5a774652417757367838536b5952674261
-  # Thời hạn Access Token tính bằng mili-giây (15 phút = 900000)
-  expiration: 900000
-  refresh-expiration: 604800000
+  secret: ${JWT_SECRET:4b6a4a6e744e6b726466384a51356f5a774652417757367838536b5952674261}
+  expiration: ${JWT_EXPIRATION:900000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
 
+app:
+  internal-secret: ${APP_INTERNAL_SECRET:MocHuongSecretKey2026InternalAuth}
 
-# Thêm vào dưới cùng file application.yml
 cloudinary:
-  url: "cloudinary://135985971514938:RDfYcvyUFfsz4N5vODi3Ac_Cf8k@drnufjdn2"
-
+  url: ${CLOUDINARY_URL:cloudinary://135985971514938:RDfYcvyUFfsz4N5vODi3Ac_Cf8k@drnufjdn2}

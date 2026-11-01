@@ -34,6 +34,10 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     Optional<Product> findBySlug(String slug);
 
+    boolean existsBySlug(String slug);
+
+    boolean existsBySlugAndIdNot(String slug, Long id);
+
     Page<Product> findByIsActiveFalse(Pageable pageable);
 
     @Query("SELECT p FROM Product p WHERE p.isPublished = true AND p.isActive = true ORDER BY p.totalSold DESC, p.averageRating DESC")

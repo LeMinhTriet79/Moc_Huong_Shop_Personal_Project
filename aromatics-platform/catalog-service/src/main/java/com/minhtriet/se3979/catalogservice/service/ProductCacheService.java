@@ -6,13 +6,15 @@ import com.minhtriet.se3979.catalogservice.dto.response.ProductDetailResponse;
 import com.minhtriet.se3979.catalogservice.dto.response.ProductResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 @Slf4j
 @Service
@@ -52,10 +54,10 @@ public class ProductCacheService {
         }
     }
 
-    // Lấy chi tiết sản phẩm theo slug từ Redis
-    public Optional<ProductDetailResponse> getProductDetailBySlug(String slug) {
+    // Lấy chi tiết sản phẩm theo slug hoặc id từ Redis
+    public Optional<ProductDetailResponse> getProductDetailBySlug(String slugOrId) {
         try {
-            String key = SLUG_CACHE_PREFIX + slug;
+            String key = SLUG_CACHE_PREFIX + slugOrId;
             String json = redisTemplate.opsForValue().get(key);
             if (json == null || json.isBlank()) {
                 return Optional.empty();
@@ -68,39 +70,56 @@ public class ProductCacheService {
         }
     }
 
-    // Ghi cache chi tiết sản phẩm theo slug
-    public void cacheProductDetail(String slug, ProductDetailResponse detail) {
+    // Ghi cache chi tiết sản phẩm theo slug hoặc id
+    public void cacheProductDetail(String slugOrId, ProductDetailResponse detail) {
         try {
-            String key = SLUG_CACHE_PREFIX + slug;
+            String key = SLUG_CACHE_PREFIX + slugOrId;
             String json = objectMapper.writeValueAsString(detail);
             redisTemplate.opsForValue().set(key, json, SLUG_TTL);
         } catch (Exception e) {
-            log.error("Lỗi khi ghi cache product detail theo slug: {}", e.getMessage());
+            log.error("Lỗi khi ghi cache product detail: {}", e.getMessage());
         }
     }
 
-    // Xóa cache khi có cập nhật sản phẩm
-    public void evictProduct(String slug) {
+    // Xóa cache khi có cập nhật sản phẩm (hỗ trợ cả slug lẫn id)
+    public void evictProduct(Long productId, String slug) {
         try {
             if (slug != null && !slug.isBlank()) {
                 redisTemplate.delete(SLUG_CACHE_PREFIX + slug);
             }
+            if (productId != null) {
+                redisTemplate.delete(SLUG_CACHE_PREFIX + productId);
+            }
             redisTemplate.delete(FEATURED_PRODUCTS_KEY);
-            log.debug("Đã xóa cache sản phẩm: slug={}, featured", slug);
+            log.debug("Đã xóa cache sản phẩm: id={}, slug={}", productId, slug);
         } catch (Exception e) {
             log.error("Lỗi khi xóa cache sản phẩm: {}", e.getMessage());
         }
     }
 
-    // Xóa toàn bộ cache sản phẩm
+    public void evictProduct(String slug) {
+        evictProduct(null, slug);
+    }
+
+    // Xóa toàn bộ cache sản phẩm bằng Redis SCAN không chặn luồng
     public void evictAllProductCaches() {
         try {
             redisTemplate.delete(FEATURED_PRODUCTS_KEY);
-            Set<String> keys = redisTemplate.keys(SLUG_CACHE_PREFIX + "*");
-            if (keys != null && !keys.isEmpty()) {
-                redisTemplate.delete(keys);
+            ScanOptions options = ScanOptions.scanOptions().match(SLUG_CACHE_PREFIX + "*").count(100).build();
+            try (Cursor<String> cursor = redisTemplate.scan(options)) {
+                List<String> keys = new ArrayList<>();
+                while (cursor.hasNext()) {
+                    keys.add(cursor.next());
+                    if (keys.size() >= 100) {
+                        redisTemplate.delete(keys);
+                        keys.clear();
+                    }
+                }
+                if (!keys.isEmpty()) {
+                    redisTemplate.delete(keys);
+                }
             }
-            log.info("Đã xóa sạch toàn bộ cache sản phẩm trên Redis");
+            log.info("Đã xóa sạch toàn bộ cache sản phẩm trên Redis bằng SCAN không chặn luồng");
         } catch (Exception e) {
             log.error("Lỗi khi dọn dẹp toàn bộ cache sản phẩm: {}", e.getMessage());
         }

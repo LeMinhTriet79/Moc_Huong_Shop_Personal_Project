@@ -58,8 +58,8 @@ public class CouponServiceImpl implements CouponService {
                     .build();
         }
 
-        Optional<Coupon> opt = couponRepository.findByCode(couponCode.trim().toUpperCase());
-        if (opt.isEmpty()) {
+        Optional<Coupon> couponOpt = couponRepository.findByCode(couponCode.trim().toUpperCase());
+        if (couponOpt.isEmpty()) {
             return CouponCalculationResult.builder()
                     .couponCode(couponCode)
                     .discountAmount(BigDecimal.ZERO)
@@ -69,19 +69,20 @@ public class CouponServiceImpl implements CouponService {
                     .build();
         }
 
-        Coupon coupon = opt.get();
+        Coupon coupon = couponOpt.get();
+        LocalDateTime now = LocalDateTime.now();
+
         if (!Boolean.TRUE.equals(coupon.getIsActive())) {
             return CouponCalculationResult.builder()
                     .couponCode(couponCode)
                     .discountAmount(BigDecimal.ZERO)
                     .finalTotal(defaultTotal)
                     .isValid(false)
-                    .message("Mã giảm giá hiện không hoạt động")
+                    .message("Mã giảm giá hiện đang bị vô hiệu hóa")
                     .build();
         }
 
-        LocalDateTime now = LocalDateTime.now();
-        if (now.isBefore(coupon.getStartsAt())) {
+        if (coupon.getStartsAt() != null && coupon.getStartsAt().isAfter(now)) {
             return CouponCalculationResult.builder()
                     .couponCode(couponCode)
                     .discountAmount(BigDecimal.ZERO)
@@ -91,7 +92,7 @@ public class CouponServiceImpl implements CouponService {
                     .build();
         }
 
-        if (coupon.getExpiresAt() != null && now.isAfter(coupon.getExpiresAt())) {
+        if (coupon.getExpiresAt() != null && coupon.getExpiresAt().isBefore(now)) {
             return CouponCalculationResult.builder()
                     .couponCode(couponCode)
                     .discountAmount(BigDecimal.ZERO)
@@ -182,8 +183,11 @@ public class CouponServiceImpl implements CouponService {
                 .orElse(null);
         if (coupon == null) return null;
 
-        coupon.setUsedCount(coupon.getUsedCount() + 1);
-        couponRepository.save(coupon);
+        int updated = couponRepository.incrementUsedCount(coupon.getId());
+        if (updated == 0) {
+            log.warn("Mã giảm giá '{}' đã hết lượt sử dụng tối đa", couponCode);
+            throw new AppException(HttpStatus.BAD_REQUEST, "Mã giảm giá đã hết lượt sử dụng");
+        }
 
         CouponUsage usage = CouponUsage.builder()
                 .coupon(coupon)
@@ -204,11 +208,10 @@ public class CouponServiceImpl implements CouponService {
             couponUsageRepository.save(usage);
 
             Coupon coupon = usage.getCoupon();
-            if (coupon != null && coupon.getUsedCount() > 0) {
-                coupon.setUsedCount(coupon.getUsedCount() - 1);
-                couponRepository.save(coupon);
+            if (coupon != null) {
+                couponRepository.decrementUsedCount(coupon.getId());
+                log.info("Đã hoàn lại lượt sử dụng mã giảm giá '{}' cho đơn hàng id: {}", coupon.getCode(), orderId);
             }
-            log.info("Đã hoàn lại lượt sử dụng mã giảm giá '{}' cho đơn hàng id: {}", coupon != null ? coupon.getCode() : "N/A", orderId);
         });
     }
 

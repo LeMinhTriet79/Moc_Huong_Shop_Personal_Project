@@ -59,6 +59,17 @@ public class InventoryController {
         }
     }
 
+    // API: POST /api/catalog/inventory/deduct-batch (Internal Feign / Atomic Multi-item Checkout)
+    @PostMapping("/deduct-batch")
+    public ResponseEntity<DeductResult> deductBatchInventory(@Valid @RequestBody List<DeductRequest> items) {
+        DeductResult result = inventoryService.deductStockBatch(items);
+        if (result.isSuccess()) {
+            return ResponseEntity.ok(result);
+        } else {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(result);
+        }
+    }
+
     // API: POST /api/catalog/inventory/restore (Internal Feign / Order Cancellation)
     @PostMapping("/restore")
     public ResponseEntity<ApiResponse<String>> restoreInventory(@Valid @RequestBody RestoreStockRequest request) {

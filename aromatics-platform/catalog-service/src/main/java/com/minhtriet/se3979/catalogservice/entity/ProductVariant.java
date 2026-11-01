@@ -2,6 +2,7 @@ package com.minhtriet.se3979.catalogservice.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -56,6 +57,7 @@ public class ProductVariant {
 
     // Thêm quan hệ ngược lại để ProductVariant có thể lấy được số lượng tồn kho
     @OneToOne(mappedBy = "variant", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @BatchSize(size = 25)
     private Inventory inventory;
 
     @CreationTimestamp

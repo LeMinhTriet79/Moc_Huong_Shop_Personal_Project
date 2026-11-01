@@ -80,6 +80,7 @@ public class NotificationDispatcherService {
                     .referenceId(referenceId)
                     .subject(subject)
                     .contentPreview(contentPreview)
+                    .bodyContent(body)
                     .status("PENDING")
                     .retryCount(0)
                     .build();
@@ -88,6 +89,7 @@ public class NotificationDispatcherService {
         nLog.setRecipient(targetRecipient);
         nLog.setSubject(subject);
         nLog.setContentPreview(contentPreview);
+        nLog.setBodyContent(body);
 
         try {
             // 3. Tiến hành gửi mail
@@ -127,7 +129,10 @@ public class NotificationDispatcherService {
 
         for (NotificationLog nLog : failedLogs) {
             try {
-                emailService.sendHtmlEmail(nLog.getRecipient(), nLog.getSubject(), nLog.getContentPreview());
+                String htmlBody = (nLog.getBodyContent() != null && !nLog.getBodyContent().isBlank())
+                        ? nLog.getBodyContent()
+                        : nLog.getContentPreview();
+                emailService.sendHtmlEmail(nLog.getRecipient(), nLog.getSubject(), htmlBody);
                 nLog.setStatus("SENT");
                 nLog.setSentAt(LocalDateTime.now());
                 nLog.setErrorMessage(null);

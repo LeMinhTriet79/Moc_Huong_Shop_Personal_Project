@@ -34,7 +34,7 @@ public class Review {
     @Column(name = "order_item_id")
     private Long orderItemId;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "tinyint")
     private Integer rating;
 
     @Column(length = 200)
@@ -43,7 +43,7 @@ public class Review {
     @Column(columnDefinition = "TEXT")
     private String content;
 
-    // ĐÃ SỬA: Dùng Entity riêng thay vì JSON để quản lý được ID Cloudinary
+    // Dùng Entity riêng thay vì JSON để quản lý được ID Cloudinary
     @OneToMany(mappedBy = "review", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ReviewImage> images;
 

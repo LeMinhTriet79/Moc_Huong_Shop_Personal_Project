@@ -17,7 +17,7 @@ public interface ReviewService {
     Page<ReviewResponse> getProductReviews(Long productId, Pageable pageable);
 
     // 1. Khách hàng: Cập nhật nội dung đánh giá (giữ nguyên ảnh)
-    Object updateReview(Long reviewId, Long userId, Integer rating, String content);
+    ReviewResponse updateReview(Long reviewId, Long userId, Integer rating, String content);
 
     // 2. Khách hàng: Xóa đánh giá (Dọn sạch DB và Cloudinary)
     void deleteReview(Long reviewId, Long userId);

@@ -40,4 +40,8 @@ public final class SecurityUtils {
     public static String getCurrentUserRole() {
         return getRequiredCurrentUser().getRole();
     }
+
+    public static String getCurrentUserFullName() {
+        return getCurrentUser().map(AuthenticatedUser::getFullName).orElse(null);
+    }
 }

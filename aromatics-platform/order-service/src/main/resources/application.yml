@@ -4,36 +4,37 @@ server:
 management:
   tracing:
     sampling:
-      probability: 1.0 # 1.0 nghĩa là ghi hình 100% các request (để test)
+      probability: 1.0
+
 spring:
   zipkin:
-    base-url: http://localhost:9411
+    base-url: ${MANAGEMENT_ZIPKIN_TRACING_ENDPOINT:http://localhost:9411}
   application:
     name: order-service
 
-  # C?u h�nh k?t n?i MySQL
+  # Cấu hình kết nối MySQL
   datasource:
-    url: jdbc:mysql://localhost:3306/order_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
-    username: root
-    password: 12345
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/order_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:12345}
 
-  # C?u h�nh JPA & Hibernate
+  # Cấu hình JPA & Hibernate
   jpa:
     hibernate:
-      ddl-auto: none # ?? Flyway t? qu?n l� b?ng, JPA ch? validate
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate.dialect: org.hibernate.dialect.MySQLDialect
 
-  # C?u h�nh Redis
+  # Cấu hình Redis
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
 
-  # C?u h�nh Kafka Producer (?� ???c ??a v? ?�ng chu?n c?a Spring)
+  # Cấu hình Kafka Producer
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -41,21 +42,23 @@ spring:
         spring.json.add.type.headers: false
     template:
       observation-enabled: true
+
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}
 
-# C?u h�nh JWT
+# Cấu hình JWT
 jwt:
-  # Ch? k� b� m?t (?� m� h�a Base64). Chu?i n�y �t nh?t ph?i 256-bit (t??ng ???ng 32 k� t?).
-  secret: 4b6a4a6e744e6b726466384a51356f5a774652417757367838536b5952674261
-  # Th?i h?n Access Token t�nh b?ng mili-gi�y (15 ph�t = 900000)
-  expiration: 900000
-  refresh-expiration: 604800000
+  secret: ${JWT_SECRET:4b6a4a6e744e6b726466384a51356f5a774652417757367838536b5952674261}
+  expiration: ${JWT_EXPIRATION:900000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+
+app:
+  internal-secret: ${APP_INTERNAL_SECRET:MocHuongSecretKey2026InternalAuth}
 
 vnpay:
-  tmn-code: "X776TT2O"
-  hash-secret: "5TFWJWRWYJEU75B7FYIR2VVBU04HUORT"
-  pay-url: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
-  return-url: "http://localhost:8080/api/order/payment/vnpay-return"
+  tmn-code: ${VNPAY_TMN_CODE:X776TT2O}
+  hash-secret: ${VNPAY_HASH_SECRET:5TFWJWRWYJEU75B7FYIR2VVBU04HUORT}
+  pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+  return-url: ${VNPAY_RETURN_URL:http://localhost:8080/api/order/payment/vnpay-return}

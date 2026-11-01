@@ -45,6 +45,9 @@ public class NotificationLog {
     @Column(name = "content_preview", length = 500)
     private String contentPreview;
 
+    @Column(name = "body_content", columnDefinition = "LONGTEXT")
+    private String bodyContent;
+
     @Column(nullable = false, length = 20)
     @Builder.Default
     private String status = "PENDING"; // PENDING, SENT, FAILED, SKIPPED

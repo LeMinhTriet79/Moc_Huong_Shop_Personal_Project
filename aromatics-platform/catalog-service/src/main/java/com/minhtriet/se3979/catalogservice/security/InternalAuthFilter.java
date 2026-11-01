@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -13,6 +14,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.List;
 
 @Slf4j
@@ -23,14 +26,23 @@ public class InternalAuthFilter extends OncePerRequestFilter {
     private String internalSecret;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain) throws ServletException, IOException {
 
-        String path = request.getRequestURI();
         String internalHeader = request.getHeader("X-Internal-Secret");
+        String path = request.getRequestURI();
 
-        // Nếu có X-Internal-Secret hợp lệ thì cấp quyền SYSTEM nội bộ
-        if (internalSecret.equals(internalHeader)) {
+        boolean isInternalPath = path.startsWith("/api/catalog/inventory/deduct")
+                || path.startsWith("/api/catalog/inventory/restore")
+                || (path.contains("/variants/") && path.endsWith("/internal"))
+                || path.endsWith("/variants/batch-info");
+
+        if (isInternalPath && internalHeader != null && MessageDigest.isEqual(
+                internalSecret.getBytes(StandardCharsets.UTF_8),
+                internalHeader.getBytes(StandardCharsets.UTF_8))) {
+
             AuthenticatedUser systemUser = AuthenticatedUser.builder()
                     .userId(0L)
                     .email("system@mochuong.internal")
@@ -39,8 +51,10 @@ public class InternalAuthFilter extends OncePerRequestFilter {
                     .build();
 
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                    systemUser, null, List.of(new SimpleGrantedAuthority("ROLE_SYSTEM"), new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("ROLE_STAFF")));
-
+                    systemUser,
+                    null,
+                    List.of(new SimpleGrantedAuthority("ROLE_SYSTEM"))
+            );
             SecurityContextHolder.getContext().setAuthentication(authentication);
         }
 

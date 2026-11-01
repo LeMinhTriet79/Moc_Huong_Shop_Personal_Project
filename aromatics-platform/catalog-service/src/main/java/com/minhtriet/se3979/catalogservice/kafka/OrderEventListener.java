@@ -4,8 +4,8 @@ import com.minhtriet.se3979.catalogservice.entity.Product;
 import com.minhtriet.se3979.catalogservice.entity.ProductVariant;
 import com.minhtriet.se3979.catalogservice.repository.ProductRepository;
 import com.minhtriet.se3979.catalogservice.repository.ProductVariantRepository;
+import com.minhtriet.se3979.catalogservice.service.InventoryService;
 import com.minhtriet.se3979.catalogservice.service.ProductCacheService;
-import com.minhtriet.se3979.catalogservice.service.impl.InventoryServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -20,7 +20,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class OrderEventListener {
 
-    private final InventoryServiceImpl inventoryService;
+    private final InventoryService inventoryService;
     private final ProductVariantRepository productVariantRepository;
     private final ProductRepository productRepository;
     private final ProductCacheService productCacheService;
@@ -34,6 +34,7 @@ public class OrderEventListener {
             log.info("🚨 KAFKA ALERT: Đơn hàng {} vừa bị HỦY!", orderCode);
             log.info("📦 Chuẩn bị chạy Giao dịch bù trừ (Compensating Transaction)...");
 
+            @SuppressWarnings("unchecked")
             List<Map<String, Object>> items = (List<Map<String, Object>>) orderData.get("items");
 
             if (items != null) {
@@ -60,6 +61,7 @@ public class OrderEventListener {
             String orderCode = (String) orderData.get("orderCode");
             log.info("🛒 KAFKA: Nhận sự kiện order.created cho mã đơn: {}", orderCode);
 
+            @SuppressWarnings("unchecked")
             List<Map<String, Object>> items = (List<Map<String, Object>>) orderData.get("items");
             if (items != null && !items.isEmpty()) {
                 for (Map<String, Object> item : items) {
@@ -76,7 +78,7 @@ public class OrderEventListener {
                                 int currentSold = product.getTotalSold() != null ? product.getTotalSold() : 0;
                                 product.setTotalSold(currentSold + quantity);
                                 productRepository.save(product);
-                                productCacheService.evictProduct(product.getSlug());
+                                productCacheService.evictProduct(product.getId(), product.getSlug());
                                 log.info("Đã tăng totalSold (+{}) cho sản phẩm '{}' (ID: {})",
                                         quantity, product.getName(), product.getId());
                             }

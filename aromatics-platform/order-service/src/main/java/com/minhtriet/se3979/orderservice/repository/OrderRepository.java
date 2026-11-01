@@ -6,7 +6,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
@@ -26,6 +25,9 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
     Page<Order> findByUserIdAndStatus(Long userId, String status, Pageable pageable);
 
     Page<Order> findByUserIdAndStatusIn(Long userId, List<String> statuses, Pageable pageable);
+
+    List<Order> findByStatusAndPaymentMethodAndCreatedAtBefore(
+            String status, String paymentMethod, LocalDateTime threshold);
 
     @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.paymentStatus = 'PAID'")
     BigDecimal sumTotalPaidRevenue();

@@ -1,0 +1,29 @@
+# Compiled Java & Maven
+**/target/
+**/*.class
+**/*.jar
+**/*.war
+**/*.ear
+!**/wrapper/*.jar
+hs_err_pid*.log
+replay_pid*.log
+
+# Node & Next.js Frontend
+**/node_modules/
+**/.next/
+**/out/
+**/build/
+next-env.d.ts
+*.tsbuildinfo
+
+# IDE & OS
+**/.idea/
+**/*.iml
+**/.vscode/
+**/.DS_Store
+Thumbs.db
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local

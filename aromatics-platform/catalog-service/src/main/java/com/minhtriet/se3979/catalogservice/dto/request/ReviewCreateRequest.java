@@ -19,6 +19,7 @@ public class ReviewCreateRequest {
 
     private Long variantId;
 
+    @JsonAlias({"orderId"})
     private Long orderItemId;
 
     private Long orderId;

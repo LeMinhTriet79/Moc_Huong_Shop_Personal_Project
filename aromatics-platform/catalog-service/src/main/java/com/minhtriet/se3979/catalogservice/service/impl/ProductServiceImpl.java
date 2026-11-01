@@ -78,7 +78,8 @@ public class ProductServiceImpl implements ProductService {
         }
 
         ProductDetailResponse detail = mapToDetailResponse(product);
-        productCacheService.cacheProductDetail(slugOrId, detail);
+        productCacheService.cacheProductDetail(detail.getSlug(), detail);
+        productCacheService.cacheProductDetail(String.valueOf(detail.getId()), detail);
         return detail;
     }
 
@@ -109,7 +110,10 @@ public class ProductServiceImpl implements ProductService {
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy danh mục!"));
 
-        String slug = generateSlug(request.getName()) + "-" + System.currentTimeMillis();
+        String slug = generateSlug(request.getName());
+        if (productRepository.existsBySlug(slug)) {
+            slug = slug + "-" + System.currentTimeMillis();
+        }
 
         List<String> uploadedCloudinaryIds = new ArrayList<>();
 
@@ -201,7 +205,7 @@ public class ProductServiceImpl implements ProductService {
             savedProduct.setVariants(savedVariants);
 
             // Xóa cache danh sách sản phẩm nổi bật
-            productCacheService.evictProduct(slug);
+            productCacheService.evictProduct(savedProduct.getId(), slug);
 
             return mapToDetailResponse(savedProduct);
 
@@ -230,9 +234,14 @@ public class ProductServiceImpl implements ProductService {
         String oldSlug = product.getSlug();
 
         if (request != null) {
-            if (request.getName() != null && !request.getName().isBlank()) {
-                product.setName(request.getName());
-                product.setSlug(generateSlug(request.getName()) + "-" + System.currentTimeMillis());
+            if (request.getName() != null && !request.getName().isBlank()
+                    && !request.getName().trim().equalsIgnoreCase(product.getName())) {
+                product.setName(request.getName().trim());
+                String candidateSlug = generateSlug(product.getName());
+                if (productRepository.existsBySlugAndIdNot(candidateSlug, productId)) {
+                    candidateSlug = candidateSlug + "-" + productId;
+                }
+                product.setSlug(candidateSlug);
             }
             if (request.getCategoryId() != null) {
                 Category category = categoryRepository.findById(request.getCategoryId())
@@ -299,9 +308,9 @@ public class ProductServiceImpl implements ProductService {
 
         Product saved = productRepository.save(product);
 
-        // Evict cache cả slug cũ và slug mới
-        productCacheService.evictProduct(oldSlug);
-        productCacheService.evictProduct(saved.getSlug());
+        // Evict cache cả slug cũ và slug mới kèm productId
+        productCacheService.evictProduct(productId, oldSlug);
+        productCacheService.evictProduct(productId, saved.getSlug());
 
         return mapToDetailResponse(saved);
     }
@@ -319,7 +328,7 @@ public class ProductServiceImpl implements ProductService {
         product.setIsActive(false);
         productRepository.save(product);
 
-        productCacheService.evictProduct(product.getSlug());
+        productCacheService.evictProduct(product.getId(), product.getSlug());
     }
 
     @Transactional
@@ -335,7 +344,7 @@ public class ProductServiceImpl implements ProductService {
         product.setIsActive(true);
         productRepository.save(product);
 
-        productCacheService.evictProduct(product.getSlug());
+        productCacheService.evictProduct(product.getId(), product.getSlug());
     }
 
     @Transactional
@@ -370,7 +379,7 @@ public class ProductServiceImpl implements ProductService {
 
         productRepository.delete(product);
 
-        productCacheService.evictProduct(product.getSlug());
+        productCacheService.evictProduct(product.getId(), product.getSlug());
     }
 
     @Override

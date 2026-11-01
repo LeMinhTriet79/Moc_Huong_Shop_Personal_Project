@@ -21,7 +21,10 @@ import com.minhtriet.se3979.identityservice.service.AuthService;
 import com.minhtriet.se3979.identityservice.service.TokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
@@ -29,8 +32,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -45,6 +50,8 @@ public class AuthServiceImpl implements AuthService {
     private final AuthenticationManager authenticationManager;
     private final TokenService tokenService;
     private final AuthNotificationPublisher authNotificationPublisher;
+
+    private final RestTemplate restTemplate = new RestTemplate();
 
     @Override
     @Transactional
@@ -132,11 +139,7 @@ public class AuthServiceImpl implements AuthService {
                 .avatarUrl(user.getAvatarUrl())
                 .build();
 
-        return AuthResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .user(userResponse)
-                .build();
+        return AuthResponse.of(accessToken, refreshToken, userResponse);
     }
 
     @Override
@@ -161,11 +164,7 @@ public class AuthServiceImpl implements AuthService {
                 .avatarUrl(user.getAvatarUrl())
                 .build();
 
-        return AuthResponse.builder()
-                .accessToken(newAccessToken)
-                .refreshToken(newRefreshToken)
-                .user(userResponse)
-                .build();
+        return AuthResponse.of(newAccessToken, newRefreshToken, userResponse);
     }
 
     @Override
@@ -244,13 +243,72 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponse googleLogin(GoogleAuthRequest request, String ipAddress, String deviceInfo) {
-        User user = userRepository.findByEmail(request.getEmail()).orElseGet(() -> {
+        String email = request.getEmail();
+        String fullName = request.getFullName();
+        String avatarUrl = request.getAvatarUrl();
+        String providerId = request.getProviderId();
+
+        // Nếu client gửi idToken, tiến hành xác thực tokenInfo với Google
+        if (request.getIdToken() != null && !request.getIdToken().isBlank()) {
+            try {
+                String googleTokenInfoUrl = "https://oauth2.googleapis.com/tokeninfo?id_token=" + request.getIdToken();
+                ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                        googleTokenInfoUrl,
+                        HttpMethod.GET,
+                        null,
+                        new ParameterizedTypeReference<>() {}
+                );
+
+                Map<String, Object> body = response.getBody();
+                if (body == null || !body.containsKey("email")) {
+                    throw new AppException(HttpStatus.UNAUTHORIZED, "Xác thực Google ID Token không hợp lệ");
+                }
+
+                String verifiedEmail = (String) body.get("email");
+                Object emailVerifiedObj = body.get("email_verified");
+                boolean emailVerified = emailVerifiedObj instanceof Boolean
+                        ? (Boolean) emailVerifiedObj
+                        : Boolean.parseBoolean(String.valueOf(emailVerifiedObj));
+
+                if (!emailVerified) {
+                    throw new AppException(HttpStatus.UNAUTHORIZED, "Tài khoản Google chưa được xác thực email");
+                }
+
+                email = verifiedEmail;
+                fullName = body.containsKey("name") && body.get("name") != null
+                        ? (String) body.get("name")
+                        : (fullName != null && !fullName.isBlank() ? fullName : verifiedEmail);
+                avatarUrl = body.containsKey("picture") && body.get("picture") != null
+                        ? (String) body.get("picture")
+                        : avatarUrl;
+                providerId = body.containsKey("sub") && body.get("sub") != null
+                        ? (String) body.get("sub")
+                        : providerId;
+
+            } catch (AppException ae) {
+                throw ae;
+            } catch (Exception e) {
+                log.error("Lỗi khi xác thực ID Token với Google: {}", e.getMessage());
+                throw new AppException(HttpStatus.UNAUTHORIZED, "Xác thực Google ID Token thất bại: " + e.getMessage());
+            }
+        }
+
+        if (email == null || email.isBlank()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Email không được để trống khi đăng nhập Google");
+        }
+
+        final String finalEmail = email;
+        final String finalFullName = (fullName != null && !fullName.isBlank()) ? fullName : email;
+        final String finalAvatarUrl = avatarUrl;
+        final String finalProviderId = providerId;
+
+        User user = userRepository.findByEmail(finalEmail).orElseGet(() -> {
             User newUser = User.builder()
-                    .email(request.getEmail())
-                    .fullName(request.getFullName())
-                    .avatarUrl(request.getAvatarUrl())
+                    .email(finalEmail)
+                    .fullName(finalFullName)
+                    .avatarUrl(finalAvatarUrl)
                     .provider(Provider.GOOGLE)
-                    .providerId(request.getProviderId())
+                    .providerId(finalProviderId)
                     .passwordHash(passwordEncoder.encode(UUID.randomUUID().toString()))
                     .role(Role.CUSTOMER)
                     .isActive(true)
@@ -258,6 +316,15 @@ public class AuthServiceImpl implements AuthService {
                     .build();
             return userRepository.save(newUser);
         });
+
+        // Chặn tuyệt đối đăng nhập Google vào tài khoản ADMIN hoặc STAFF nếu chưa cấu hình providerId khớp
+        if (user.getRole() == Role.ADMIN || user.getRole() == Role.STAFF) {
+            if (user.getProvider() != Provider.GOOGLE || user.getProviderId() == null
+                    || !user.getProviderId().equals(finalProviderId)) {
+                throw new AppException(HttpStatus.FORBIDDEN,
+                        "Tài khoản Quản trị/Nhân viên bắt buộc đăng nhập bằng mật khẩu nội bộ!");
+            }
+        }
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
             throw new AppException(HttpStatus.FORBIDDEN, "Tài khoản đã bị khóa");
@@ -277,10 +344,6 @@ public class AuthServiceImpl implements AuthService {
                 .avatarUrl(user.getAvatarUrl())
                 .build();
 
-        return AuthResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .user(userResponse)
-                .build();
+        return AuthResponse.of(accessToken, refreshToken, userResponse);
     }
 }

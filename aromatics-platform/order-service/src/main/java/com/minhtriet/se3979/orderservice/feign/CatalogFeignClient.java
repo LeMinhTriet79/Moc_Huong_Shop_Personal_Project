@@ -11,11 +11,16 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import java.util.List;
+
 @FeignClient(name = "catalog-service")
 public interface CatalogFeignClient {
 
     @PostMapping("/api/catalog/inventory/deduct")
     ResponseEntity<DeductResult> deductInventory(@RequestBody DeductRequest request);
+
+    @PostMapping("/api/catalog/inventory/deduct-batch")
+    ResponseEntity<DeductResult> deductBatchInventory(@RequestBody List<DeductRequest> requests);
 
     @GetMapping("/api/catalog/products/variants/{variantId}/internal")
     ResponseEntity<ApiResponse<VariantInternalInfoResponse>> getVariantInternalInfo(@PathVariable("variantId") Long variantId);

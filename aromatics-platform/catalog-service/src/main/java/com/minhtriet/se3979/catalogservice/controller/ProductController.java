@@ -8,6 +8,7 @@ import com.minhtriet.se3979.catalogservice.dto.response.ProductDetailResponse;
 import com.minhtriet.se3979.catalogservice.dto.response.ProductResponse;
 import com.minhtriet.se3979.catalogservice.exception.AppException;
 import com.minhtriet.se3979.catalogservice.service.ProductService;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -28,6 +29,7 @@ public class ProductController {
 
     private final ProductService productService;
     private final ObjectMapper objectMapper;
+    private final Validator validator;
 
     // Tìm kiếm sản phẩm theo nhiều tiêu chí
     @GetMapping
@@ -78,6 +80,12 @@ public class ProductController {
             @RequestPart(value = "images", required = false) List<MultipartFile> files) {
         try {
             ProductCreateRequest request = objectMapper.readValue(productJson, ProductCreateRequest.class);
+
+            var violations = validator.validate(request);
+            if (!violations.isEmpty()) {
+                throw new AppException(HttpStatus.BAD_REQUEST, violations.iterator().next().getMessage());
+            }
+
             ProductDetailResponse response = productService.createProductWithImages(request, files);
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(ApiResponse.success(response, "Thêm sản phẩm mới thành công!"));
@@ -100,6 +108,10 @@ public class ProductController {
             ProductUpdateRequest request = null;
             if (productJson != null && !productJson.isBlank()) {
                 request = objectMapper.readValue(productJson, ProductUpdateRequest.class);
+                var violations = validator.validate(request);
+                if (!violations.isEmpty()) {
+                    throw new AppException(HttpStatus.BAD_REQUEST, violations.iterator().next().getMessage());
+                }
             }
             List<MultipartFile> combinedImages = new java.util.ArrayList<>();
             if (images != null) combinedImages.addAll(images);

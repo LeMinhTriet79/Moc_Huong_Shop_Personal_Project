@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 @Slf4j
 @Service
@@ -15,18 +17,25 @@ public class OrderEventPublisher {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void publishOrderCreated(OrderCreatedEvent event) {
-        kafkaTemplate.send("order.created", event.getOrderId().toString(), event);
-        log.info("[KAFKA] Đã phát sóng sự kiện tạo đơn hàng thành công cho Mã đơn: {}", event.getOrderCode());
+        String key = event.getOrderId() != null ? event.getOrderId().toString() : event.getOrderCode();
+        kafkaTemplate.send("order.created", key, event);
+        log.info("[KAFKA] Đã phát sự kiện order.created cho mã đơn: {}", event.getOrderCode());
     }
 
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void publishOrderCancelled(OrderCancelledEvent event) {
-        kafkaTemplate.send("order.cancelled", event.getOrderId().toString(), event);
-        log.info("[KAFKA] Đã phát sóng sự kiện HỦY đơn hàng cho Mã đơn: {}", event.getOrderCode());
+        String key = event.getOrderId() != null ? event.getOrderId().toString() : event.getOrderCode();
+        kafkaTemplate.send("order.cancelled", key, event);
+        log.info("[KAFKA] Đã phát sự kiện order.cancelled cho mã đơn: {}", event.getOrderCode());
     }
 
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void publishOrderStatusChanged(OrderStatusChangedEvent event) {
-        kafkaTemplate.send("order.status.changed", event.getOrderId().toString(), event);
-        log.info("[KAFKA] Đã phát sóng sự kiện đổi trạng thái đơn hàng {} sang {}", event.getOrderCode(), event.getToStatus());
+        String key = event.getOrderId() != null ? event.getOrderId().toString() : event.getOrderCode();
+        kafkaTemplate.send("order.status.changed", key, event);
+        log.info("[KAFKA] Đã phát sự kiện order.status.changed cho mã đơn: {} -> {}",
+                event.getOrderCode(), event.getToStatus());
     }
 }

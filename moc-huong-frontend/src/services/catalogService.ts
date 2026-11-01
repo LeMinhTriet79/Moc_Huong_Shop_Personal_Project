@@ -67,7 +67,14 @@ export const catalogService = {
   },
 
   async createReview(data: ReviewCreateRequest): Promise<ReviewResponse> {
-    const res = await api.post<ApiResponse<ReviewResponse>>('/api/catalog/reviews', data);
+    const rawData = data as any;
+    const commentText = data.comment || rawData.content || '';
+    const payload = {
+      ...data,
+      comment: commentText,
+      content: commentText,
+    };
+    const res = await api.post<ApiResponse<ReviewResponse>>('/api/catalog/reviews', payload);
     return res.data.data;
   },
 

@@ -44,6 +44,7 @@ export interface AuthResponse {
   email: string;
   fullName: string;
   role: UserRole;
+  user?: UserResponse;
 }
 
 export interface AddressResponse {
@@ -167,8 +168,10 @@ export interface ReviewResponse {
 export interface ReviewCreateRequest {
   productId: number;
   orderId?: number;
+  orderItemId?: number;
   rating: number;
   comment: string;
+  content?: string;
 }
 
 // Order & Cart

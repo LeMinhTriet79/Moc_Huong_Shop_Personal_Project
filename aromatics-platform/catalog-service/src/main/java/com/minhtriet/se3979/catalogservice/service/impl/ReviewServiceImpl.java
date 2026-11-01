@@ -5,16 +5,17 @@ import com.minhtriet.se3979.catalogservice.dto.response.ReviewResponse;
 import com.minhtriet.se3979.catalogservice.entity.*;
 import com.minhtriet.se3979.catalogservice.exception.AppException;
 import com.minhtriet.se3979.catalogservice.repository.*;
+import com.minhtriet.se3979.catalogservice.security.SecurityUtils;
 import com.minhtriet.se3979.catalogservice.service.CloudinaryService;
 import com.minhtriet.se3979.catalogservice.service.ProductCacheService;
 import com.minhtriet.se3979.catalogservice.service.ReviewService;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
@@ -150,12 +151,19 @@ public class ReviewServiceImpl implements ReviewService {
         String prodName = review.getProduct() != null ? review.getProduct().getName() : null;
         boolean verified = review.getOrderItemId() != null;
 
+        String userName = "Khách hàng #" + review.getUserId();
+        var currentUser = SecurityUtils.getCurrentUser();
+        if (currentUser.isPresent() && currentUser.get().getUserId().equals(review.getUserId())
+                && currentUser.get().getFullName() != null && !currentUser.get().getFullName().isBlank()) {
+            userName = currentUser.get().getFullName();
+        }
+
         return ReviewResponse.builder()
                 .id(review.getId())
                 .productId(prodId)
                 .productName(prodName)
                 .userId(review.getUserId())
-                .userName("Khách hàng #" + review.getUserId())
+                .userName(userName)
                 .variantName(variantName)
                 .rating(review.getRating())
                 .title(review.getTitle())
@@ -173,16 +181,16 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Transactional
     @Override
-    public Object updateReview(Long reviewId, Long userId, Integer rating, String content) {
+    public ReviewResponse updateReview(Long reviewId, Long userId, Integer rating, String content) {
         Review review = reviewRepository.findByIdAndUserId(reviewId, userId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đánh giá hoặc bạn không có quyền sửa!"));
 
         review.setRating(rating);
         review.setContent(content);
-        reviewRepository.saveAndFlush(review);
+        review = reviewRepository.saveAndFlush(review);
 
         recalculateProductRating(review.getProduct());
-        return "Cập nhật đánh giá thành công!";
+        return mapToReviewResponse(review);
     }
 
     @Transactional
@@ -241,6 +249,6 @@ public class ReviewServiceImpl implements ReviewService {
         productRepository.save(product);
 
         // Xóa cache khi cập nhật rating
-        productCacheService.evictProduct(product.getSlug());
+        productCacheService.evictProduct(product.getId(), product.getSlug());
     }
 }

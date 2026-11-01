@@ -28,8 +28,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Mở cửa public cho xem danh mục, sản phẩm, tồn kho theo biến thể và đánh giá
                         .requestMatchers(HttpMethod.GET, "/api/catalog/products/**", "/api/catalog/categories/**", "/api/catalog/inventory/variant/**", "/api/catalog/reviews/**").permitAll()
-                        // API nội bộ: trừ kho, hoàn kho, lấy chi tiết biến thể (yêu cầu SYSTEM hoặc STAFF/ADMIN)
-                        .requestMatchers("/api/catalog/inventory/deduct", "/api/catalog/inventory/restore",
+                        // API nội bộ: trừ kho, hoàn kho, trừ kho theo lô, lấy chi tiết biến thể (yêu cầu SYSTEM hoặc STAFF/ADMIN)
+                        .requestMatchers("/api/catalog/inventory/deduct", "/api/catalog/inventory/deduct-batch", "/api/catalog/inventory/restore",
                                 "/api/catalog/products/variants/*/internal", "/api/catalog/products/variants/batch-info")
                         .hasAnyRole("SYSTEM", "STAFF", "ADMIN")
                         // Mở cửa cho Swagger UI & Error
