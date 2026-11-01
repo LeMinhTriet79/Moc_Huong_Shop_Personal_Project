@@ -18,6 +18,8 @@ public interface OrderService {
 
     OrderResponse requestReturn(Long orderId, Long userId, String reason);
 
+    OrderDetailResponse completeOrder(Long orderId, Long userId);
+
     Page<OrderResponse> getCustomerOrders(Long userId, String status, Pageable pageable);
 
     OrderDetailResponse getOrderDetailByCode(String orderCode, Long userId);

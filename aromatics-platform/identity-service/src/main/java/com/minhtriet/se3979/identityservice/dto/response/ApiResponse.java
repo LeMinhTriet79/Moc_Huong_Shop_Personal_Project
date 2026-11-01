@@ -41,4 +41,8 @@ public class ApiResponse<T> {
                 .timestamp(LocalDateTime.now())
                 .build();
     }
+
+    public static <T> ApiResponse<T> error(int status, String message) {
+        return error(status, status >= 500 ? "Internal Server Error" : (status == 401 ? "Unauthorized" : "Forbidden"), message);
+    }
 }

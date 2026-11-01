@@ -3,6 +3,7 @@ package com.minhtriet.se3979.orderservice.service.impl;
 import com.minhtriet.se3979.orderservice.entity.Order;
 import com.minhtriet.se3979.orderservice.exception.AppException;
 import com.minhtriet.se3979.orderservice.repository.OrderRepository;
+import com.minhtriet.se3979.orderservice.security.SecurityUtils;
 import com.minhtriet.se3979.orderservice.service.OrderService;
 import com.minhtriet.se3979.orderservice.service.VNPayService;
 import com.minhtriet.se3979.orderservice.vnpay.VNPayUtil;
@@ -52,6 +53,16 @@ public class VNPayServiceImpl implements VNPayService {
         if (orderId != null) {
             Order order = orderRepository.findById(orderId)
                     .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng với id: " + orderId));
+
+            // Vá IDOR: Kiểm tra quyền sở hữu đơn hàng
+            SecurityUtils.getCurrentUser().ifPresent(currentUser -> {
+                String role = currentUser.getRole();
+                boolean isPrivileged = "ADMIN".equalsIgnoreCase(role) || "STAFF".equalsIgnoreCase(role);
+                if (!isPrivileged && (order.getUserId() == null || !order.getUserId().equals(currentUser.getUserId()))) {
+                    throw new AppException(HttpStatus.FORBIDDEN, "Bạn không có quyền thanh toán đơn hàng này!");
+                }
+            });
+
             txnRef = order.getOrderCode();
             BigDecimal actualAmount = (amountParam != null && amountParam.compareTo(BigDecimal.ZERO) > 0)
                     ? amountParam : order.getTotalAmount();

@@ -4,6 +4,7 @@ import QueryProvider from '@/components/providers/QueryProvider';
 import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
 import CartDrawer from '@/components/cart/CartDrawer';
+import AiChatWidget from '@/components/common/AiChatWidget';
 
 export const metadata: Metadata = {
   title: 'MỘC HƯƠNG — Hương Từ Tâm • Mộc Từ Đất | Trầm Hương & Tinh Dầu Thiên Nhiên',
@@ -33,6 +34,7 @@ export default function RootLayout({
           <div className="flex-1">{children}</div>
           <Footer />
           <CartDrawer />
+          <AiChatWidget />
         </QueryProvider>
       </body>
     </html>

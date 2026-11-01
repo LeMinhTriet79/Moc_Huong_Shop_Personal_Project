@@ -9,6 +9,7 @@ import com.minhtriet.se3979.identityservice.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -42,7 +43,8 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success(null, "Đổi mật khẩu thành công. Vui lòng đăng nhập lại!"));
     }
 
-    // API Nội bộ: GET /api/identity/users/internal/{userId} (dùng cho Feign Client)
+    // API Nội bộ: GET /api/identity/users/internal/{userId} (chỉ cho phép SYSTEM, STAFF, ADMIN)
+    @PreAuthorize("hasAnyRole('SYSTEM', 'STAFF', 'ADMIN')")
     @GetMapping("/internal/{userId}")
     public ResponseEntity<ApiResponse<UserResponse>> getInternalUser(@PathVariable Long userId) {
         UserResponse user = userService.getUserById(userId);

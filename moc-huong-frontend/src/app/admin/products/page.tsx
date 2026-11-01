@@ -28,6 +28,7 @@ export default function AdminProductsPage() {
   const [prodTags, setProdTags] = useState('Best Seller, Tự Nhiên');
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
   // Variant Drawer
   const [variantDrawerProduct, setVariantDrawerProduct] = useState<ProductResponse | null>(null);
@@ -87,6 +88,32 @@ export default function AdminProductsPage() {
     setProdTags(Array.isArray(prod.tags) ? prod.tags.join(', ') : String(prod.tags || ''));
     setSelectedFiles(null);
     setIsModalOpen(true);
+  };
+
+  const handleGenerateAiDescription = async () => {
+    if (!prodName.trim()) {
+      toast.error('Vui lòng nhập Tên Sản Phẩm trước khi yêu cầu AI viết bài!');
+      return;
+    }
+    setIsGeneratingAi(true);
+    try {
+      const selectedCategory = categories.find((c) => c.id === prodCategoryId)?.name;
+      const keywords = prodTags ? prodTags.split(',').map((t) => t.trim()) : [];
+      const res = await catalogService.generateAiDescription(
+        prodName.trim(),
+        selectedCategory,
+        keywords,
+        'Thiền định, an thần, xua đuổi tà khí, biếu tặng tân gia'
+      );
+      if (res.reply) {
+        setProdDescription(res.reply);
+        toast.success('AI Hương Đạo đã tạo mô tả phong thủy thành công!', { icon: '✨' });
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Không thể tạo bài viết AI lúc này');
+    } finally {
+      setIsGeneratingAi(false);
+    }
   };
 
   const handleProductSubmit = async (e: React.FormEvent) => {
@@ -520,9 +547,23 @@ export default function AdminProductsPage() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-text-wood-muted uppercase mb-1">
-                    Mô Tả Sản Phẩm & Ý Nghĩa Phong Thủy
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-text-wood-muted uppercase">
+                      Mô Tả Sản Phẩm & Ý Nghĩa Phong Thủy
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleGenerateAiDescription}
+                      disabled={isGeneratingAi || !prodName.trim()}
+                      className="px-2.5 py-1 rounded-lg bg-secondary/15 hover:bg-secondary/25 text-secondary text-xs font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
+                      title="Sử dụng Google Gemini AI sáng tạo mô tả chuẩn phong thủy"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">
+                        {isGeneratingAi ? 'progress_activity' : 'auto_awesome'}
+                      </span>
+                      <span>{isGeneratingAi ? 'AI đang sáng tạo...' : '✨ AI Viết Mô Tả Phong Thủy'}</span>
+                    </button>
+                  </div>
                   <textarea
                     rows={3}
                     value={prodDescription}

@@ -22,7 +22,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
 
-
     @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
@@ -30,11 +29,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
-        // Nếu là internal request (có X-Internal-Secret hoặc đã được authenticate ROLE_SYSTEM), bỏ qua JWT filter
-        if (request.getHeader("X-Internal-Secret") != null ||
-                (SecurityContextHolder.getContext().getAuthentication() != null &&
-                 SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
-                         .anyMatch(a -> a.getAuthority().equals("ROLE_SYSTEM")))) {
+        // Nếu đã được authenticate ROLE_SYSTEM từ InternalAuthFilter, giữ nguyên và đi tiếp
+        if (SecurityContextHolder.getContext().getAuthentication() != null &&
+                SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                        .anyMatch(a -> a.getAuthority().equals("ROLE_SYSTEM"))) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -48,32 +46,34 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         try {
             String jwt = authHeader.substring(7);
-            String userEmail = jwtUtil.extractEmail(jwt);
+            if (jwtUtil.isTokenValid(jwt)) {
+                String userEmail = jwtUtil.extractEmail(jwt);
 
-            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                // Trích xuất Role từ token (VD: CUSTOMER, ADMIN)
-                String role = jwtUtil.extractRole(jwt);
-                Long userId = jwtUtil.extractUserId(jwt);
-                String fullName = jwtUtil.extractFullName(jwt);
+                if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                    // Trích xuất Role từ token (VD: CUSTOMER, STAFF, ADMIN)
+                    String role = jwtUtil.extractRole(jwt);
+                    Long userId = jwtUtil.extractUserId(jwt);
+                    String fullName = jwtUtil.extractFullName(jwt);
 
-                AuthenticatedUser authenticatedUser = AuthenticatedUser.builder()
-                        .userId(userId)
-                        .email(userEmail)
-                        .role(role)
-                        .fullName(fullName)
-                        .build();
+                    AuthenticatedUser authenticatedUser = AuthenticatedUser.builder()
+                            .userId(userId)
+                            .email(userEmail)
+                            .role(role)
+                            .fullName(fullName)
+                            .build();
 
-                // Cấp quyền đi tiếp dựa trên thông tin có sẵn trong Token
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        authenticatedUser,
-                        null,
-                        role != null ? Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role)) : Collections.emptyList()
-                );
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+                    // Cấp quyền đi tiếp dựa trên thông tin có sẵn trong Token
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            authenticatedUser,
+                            null,
+                            role != null ? Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase())) : Collections.emptyList()
+                    );
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
         } catch (Exception e) {
-            logger.error("Token không hợp lệ hoặc đã hết hạn", e);
+            logger.error("Token không hợp lệ hoặc đã hết hạn: " + e.getMessage());
         }
 
         filterChain.doFilter(request, response);

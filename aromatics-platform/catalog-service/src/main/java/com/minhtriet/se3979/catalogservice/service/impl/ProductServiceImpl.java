@@ -11,6 +11,10 @@ import com.minhtriet.se3979.catalogservice.repository.*;
 import com.minhtriet.se3979.catalogservice.service.CloudinaryService;
 import com.minhtriet.se3979.catalogservice.service.ProductCacheService;
 import com.minhtriet.se3979.catalogservice.service.ProductService;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
+import org.springframework.data.jpa.domain.Specification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -41,7 +45,53 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public Page<ProductResponse> searchProducts(String keyword, Long categoryId, String brand, BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable) {
-        Page<Product> products = productRepository.searchProducts(keyword, categoryId, brand, minPrice, maxPrice, pageable);
+        Specification<Product> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            // 1. Chỉ lấy sản phẩm published và active
+            predicates.add(cb.isTrue(root.get("isPublished")));
+            predicates.add(cb.isTrue(root.get("isActive")));
+
+            // 2. Keyword (tìm theo name hoặc brand)
+            if (keyword != null && !keyword.trim().isEmpty()) {
+                String pattern = "%" + keyword.trim().toLowerCase() + "%";
+                Predicate nameLike = cb.like(cb.lower(root.get("name")), pattern);
+                Predicate brandLike = cb.like(cb.lower(root.get("brand")), pattern);
+                predicates.add(cb.or(nameLike, brandLike));
+            }
+
+            // 3. Danh mục
+            if (categoryId != null) {
+                predicates.add(cb.equal(root.get("category").get("id"), categoryId));
+            }
+
+            // 4. Thương hiệu
+            if (brand != null && !brand.trim().isEmpty()) {
+                predicates.add(cb.equal(cb.lower(root.get("brand")), brand.trim().toLowerCase()));
+            }
+
+            // 5. Khoảng giá (minPrice, maxPrice) dùng Subquery trên ProductVariant
+            if (minPrice != null || maxPrice != null) {
+                Subquery<Long> subquery = query.subquery(Long.class);
+                Root<ProductVariant> variantRoot = subquery.from(ProductVariant.class);
+                List<Predicate> variantPredicates = new ArrayList<>();
+                variantPredicates.add(cb.equal(variantRoot.get("product").get("id"), root.get("id")));
+                variantPredicates.add(cb.isTrue(variantRoot.get("isActive")));
+                if (minPrice != null) {
+                    variantPredicates.add(cb.greaterThanOrEqualTo(variantRoot.get("price"), minPrice));
+                }
+                if (maxPrice != null) {
+                    variantPredicates.add(cb.lessThanOrEqualTo(variantRoot.get("price"), maxPrice));
+                }
+                subquery.select(variantRoot.get("product").get("id"))
+                        .where(variantPredicates.toArray(new Predicate[0]));
+                predicates.add(cb.exists(subquery));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        Page<Product> products = productRepository.findAll(spec, pageable);
         return products.map(this::mapToResponse);
     }
 

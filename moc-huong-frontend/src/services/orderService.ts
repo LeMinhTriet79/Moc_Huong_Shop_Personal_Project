@@ -61,6 +61,11 @@ export const orderService = {
     return res.data.data;
   },
 
+  async completeOrder(orderId: number): Promise<OrderResponse> {
+    const res = await api.put<ApiResponse<OrderResponse>>(`/api/order/orders/${orderId}/complete`);
+    return res.data.data;
+  },
+
   async downloadInvoicePdf(orderId: number, orderCode?: string): Promise<void> {
     const response = await api.get(`/api/order/orders/${orderId}/invoice-pdf`, {
       responseType: 'blob',

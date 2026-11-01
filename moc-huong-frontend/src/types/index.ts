@@ -126,7 +126,8 @@ export interface ProductResponse {
   tags?: string[] | string;
   attributes?: Record<string, any>;
   isActive: boolean;
-  images: ProductImageResponse[];
+  images?: ProductImageResponse[];
+  primaryImageUrl?: string;
   variants: ProductVariantResponse[];
   averageRating?: number;
   reviewCount?: number;
@@ -343,4 +344,38 @@ export interface DashboardStatsResponse {
     totalQuantity: number;
     totalRevenue: number;
   }[];
+}
+
+// AI Assistant Interfaces
+export interface ChatMessageItem {
+  role: 'user' | 'model';
+  content: string;
+}
+
+export interface AiChatRequest {
+  message: string;
+  history?: ChatMessageItem[];
+  userRole?: string;
+}
+
+export interface AiGenerateDescriptionRequest {
+  productName: string;
+  categoryName?: string;
+  keywords?: string[];
+  targetAudience?: string;
+}
+
+export interface AiSuggestReplyRequest {
+  reviewId?: number;
+  rating?: number;
+  comment: string;
+  customerName?: string;
+  productName?: string;
+}
+
+export interface AiChatResponse {
+  reply: string;
+  suggestedProducts?: ProductResponse[];
+  sources?: string[];
+  isFallback?: boolean;
 }

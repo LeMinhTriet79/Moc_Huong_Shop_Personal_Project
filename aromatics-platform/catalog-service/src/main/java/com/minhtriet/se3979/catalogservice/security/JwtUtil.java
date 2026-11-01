@@ -8,6 +8,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Date;
 import java.util.function.Function;
 
@@ -63,7 +66,19 @@ public class JwtUtil {
     }
 
     private SecretKey getSignInKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(secretKey);
-        return Keys.hmacShaKeyFor(keyBytes);
+        try {
+            byte[] keyBytes = Decoders.BASE64.decode(secretKey);
+            if (keyBytes != null && keyBytes.length >= 32) {
+                return Keys.hmacShaKeyFor(keyBytes);
+            }
+        } catch (Exception ignored) {
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(secretKey.getBytes(StandardCharsets.UTF_8));
+            return Keys.hmacShaKeyFor(hash);
+        } catch (NoSuchAlgorithmException e) {
+            return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
+        }
     }
 }

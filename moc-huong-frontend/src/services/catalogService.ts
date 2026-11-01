@@ -1,5 +1,7 @@
 import api from '@/lib/axios';
 import {
+  AiChatResponse,
+  ChatMessageItem,
   ApiResponse,
   CategoryResponse,
   InventoryResponse,
@@ -171,6 +173,54 @@ export const catalogService = {
     const res = await api.put<ApiResponse<ReviewResponse>>(
       `/api/catalog/reviews/${reviewId}/toggle-visibility`
     );
+    return res.data.data;
+  },
+
+  // ==========================================
+  // AI ASSISTANT (HƯƠNG ĐẠO MỘC HƯƠNG)
+  // ==========================================
+  async chatWithAi(
+    message: string,
+    history?: ChatMessageItem[],
+    userRole?: string
+  ): Promise<AiChatResponse> {
+    const res = await api.post<ApiResponse<AiChatResponse>>('/api/catalog/ai/chat', {
+      message,
+      history,
+      userRole,
+    });
+    return res.data.data;
+  },
+
+  async generateAiDescription(
+    productName: string,
+    categoryName?: string,
+    keywords?: string[],
+    targetAudience?: string
+  ): Promise<AiChatResponse> {
+    const res = await api.post<ApiResponse<AiChatResponse>>('/api/catalog/ai/generate-description', {
+      productName,
+      categoryName,
+      keywords,
+      targetAudience,
+    });
+    return res.data.data;
+  },
+
+  async suggestAiReviewReply(
+    comment: string,
+    rating?: number,
+    customerName?: string,
+    productName?: string,
+    reviewId?: number
+  ): Promise<AiChatResponse> {
+    const res = await api.post<ApiResponse<AiChatResponse>>('/api/catalog/ai/suggest-reply', {
+      comment,
+      rating,
+      customerName,
+      productName,
+      reviewId,
+    });
     return res.data.data;
   },
 };

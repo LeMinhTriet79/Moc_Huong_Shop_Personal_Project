@@ -14,6 +14,7 @@ export default function AdminReviewsPage() {
   const [replyReviewItem, setReplyReviewItem] = useState<ReviewResponse | null>(null);
   const [replyMessage, setReplyMessage] = useState('');
   const [isReplying, setIsReplying] = useState(false);
+  const [isSuggestingAi, setIsSuggestingAi] = useState(false);
 
   const loadReviews = async () => {
     setIsLoading(true);
@@ -44,6 +45,30 @@ export default function AdminReviewsPage() {
   const openReplyModal = (rev: ReviewResponse) => {
     setReplyReviewItem(rev);
     setReplyMessage(rev.replyMessage || rev.adminReply || '');
+  };
+
+  const handleSuggestAiReply = async () => {
+    if (!replyReviewItem) return;
+    setIsSuggestingAi(true);
+    try {
+      const commentText = replyReviewItem.comment || replyReviewItem.content || '';
+      const customerName = replyReviewItem.userName || `Quý khách #${replyReviewItem.userId}`;
+      const res = await catalogService.suggestAiReviewReply(
+        commentText,
+        replyReviewItem.rating,
+        customerName,
+        replyReviewItem.productName || 'Phẩm vật Mộc Hương',
+        replyReviewItem.id
+      );
+      if (res.reply) {
+        setReplyMessage(res.reply);
+        toast.success('AI Hương Đạo đã gợi ý câu trả lời lịch thiệp!', { icon: '✨' });
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Không thể gợi ý phản hồi AI lúc này');
+    } finally {
+      setIsSuggestingAi(false);
+    }
   };
 
   const handleReplySubmit = async (e: React.FormEvent) => {
@@ -206,9 +231,23 @@ export default function AdminReviewsPage() {
 
             <form onSubmit={handleReplySubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-text-wood-muted uppercase mb-1">
-                  Nội Dung Phản Hồi Từ Mộc Hương *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-text-wood-muted uppercase">
+                    Nội Dung Phản Hồi Từ Mộc Hương *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleSuggestAiReply}
+                    disabled={isSuggestingAi}
+                    className="px-2.5 py-1 rounded-lg bg-secondary/15 hover:bg-secondary/25 text-secondary text-xs font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
+                    title="Dùng Gemini AI gợi ý câu trả lời lịch thiệp"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">
+                      {isSuggestingAi ? 'progress_activity' : 'auto_awesome'}
+                    </span>
+                    <span>{isSuggestingAi ? 'AI đang soạn...' : '✨ AI Gợi Ý Phản Hồi'}</span>
+                  </button>
+                </div>
                 <textarea
                   rows={4}
                   value={replyMessage}

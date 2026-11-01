@@ -17,11 +17,11 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/order/admin/coupons")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
 public class AdminCouponController {
 
     private final CouponService couponService;
 
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
     @GetMapping
     public ResponseEntity<ApiResponse<Page<CouponResponse>>> getAllCoupons(
             @RequestParam(defaultValue = "0") int page,
@@ -31,12 +31,14 @@ public class AdminCouponController {
         return ResponseEntity.ok(ApiResponse.success(coupons, "Lấy danh sách mã giảm giá thành công"));
     }
 
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<CouponResponse>> getCouponById(@PathVariable Long id) {
         CouponResponse coupon = couponService.getCouponById(id);
         return ResponseEntity.ok(ApiResponse.success(coupon, "Lấy chi tiết mã giảm giá thành công"));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<ApiResponse<CouponResponse>> createCoupon(@Valid @RequestBody CouponRequest request) {
         CouponResponse response = couponService.createCoupon(request);
@@ -44,6 +46,7 @@ public class AdminCouponController {
                 .body(ApiResponse.success(response, "Tạo mã giảm giá thành công"));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<CouponResponse>> updateCoupon(
             @PathVariable Long id,
@@ -52,6 +55,7 @@ public class AdminCouponController {
         return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật mã giảm giá thành công"));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<String>> deleteCoupon(@PathVariable Long id) {
         couponService.deleteCoupon(id);

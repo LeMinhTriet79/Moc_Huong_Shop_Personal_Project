@@ -37,12 +37,15 @@ export default function OrderHistoryPage() {
   // Review Modal State
   const [reviewItem, setReviewItem] = useState<{
     orderId: number;
+    orderItemId?: number;
     productId: number;
     productName: string;
   } | null>(null);
   const [reviewRating, setReviewRating] = useState<number>(5);
   const [reviewComment, setReviewComment] = useState<string>('');
   const [isSubmittingReview, setIsSubmittingReview] = useState<boolean>(false);
+  const [reviewedItemIds, setReviewedItemIds] = useState<number[]>([]);
+  const [isCompleting, setIsCompleting] = useState<boolean>(false);
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -104,6 +107,20 @@ export default function OrderHistoryPage() {
     }
   };
 
+  const handleCompleteOrder = async (order: OrderResponse) => {
+    if (!confirm(`Xác nhận quý khách đã nhận được hàng an toàn cho đơn ${order.orderCode}?`)) return;
+    setIsCompleting(true);
+    try {
+      await orderService.completeOrder(order.id);
+      toast.success(`Đã hoàn tất đơn hàng ${order.orderCode}. Cảm ơn quý khách!`, { icon: '🌸' });
+      fetchOrders();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Không thể xác nhận hoàn tất đơn hàng lúc này');
+    } finally {
+      setIsCompleting(false);
+    }
+  };
+
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reviewItem || !reviewComment.trim()) {
@@ -115,9 +132,13 @@ export default function OrderHistoryPage() {
       await catalogService.createReview({
         productId: reviewItem.productId,
         orderId: reviewItem.orderId,
+        orderItemId: reviewItem.orderItemId,
         rating: reviewRating,
         comment: reviewComment.trim(),
       });
+      if (reviewItem.orderItemId) {
+        setReviewedItemIds((prev) => [...prev, reviewItem.orderItemId!]);
+      }
       toast.success('Cảm ơn bạn đã đánh giá sản phẩm!', { icon: '🌸' });
       setReviewItem(null);
       setReviewComment('');
@@ -272,20 +293,28 @@ export default function OrderHistoryPage() {
                           {formatCurrency(item.totalPrice)}
                         </span>
 
-                        {order.status === 'DELIVERED' && (
-                          <button
-                            onClick={() =>
-                              setReviewItem({
-                                orderId: order.id,
-                                productId: item.productId,
-                                productName: item.productName,
-                              })
-                            }
-                            className="px-3 py-1.5 rounded-xl border border-secondary text-secondary hover:bg-secondary-fixed/20 text-xs font-semibold transition-colors flex items-center gap-1"
-                          >
-                            <span className="material-symbols-outlined text-[15px]">rate_review</span>
-                            <span>Đánh Giá</span>
-                          </button>
+                        {['DELIVERED', 'COMPLETED'].includes(order.status) && (
+                          reviewedItemIds.includes(item.id) ? (
+                            <span className="px-2.5 py-1 rounded-full bg-accent-lotus-jade/15 text-accent-lotus-jade text-[11px] font-semibold flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                              <span>✓ Đã Đánh Giá</span>
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() =>
+                                setReviewItem({
+                                  orderId: order.id,
+                                  orderItemId: item.id,
+                                  productId: item.productId,
+                                  productName: item.productName,
+                                })
+                              }
+                              className="px-3 py-1.5 rounded-xl border border-secondary text-secondary hover:bg-secondary-fixed/20 text-xs font-semibold transition-colors flex items-center gap-1"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">rate_review</span>
+                              <span>Đánh Giá</span>
+                            </button>
+                          )
                         )}
                       </div>
                     </div>
@@ -316,6 +345,17 @@ export default function OrderHistoryPage() {
                           className="px-3.5 py-1.5 rounded-xl border border-status-cinnabar text-status-cinnabar hover:bg-status-cinnabar/10 text-xs font-semibold transition-colors"
                         >
                           Hủy Đơn Hàng
+                        </button>
+                      )}
+
+                      {order.status === 'DELIVERED' && (
+                        <button
+                          onClick={() => handleCompleteOrder(order)}
+                          disabled={isCompleting}
+                          className="px-4 py-1.5 rounded-xl bg-accent-lotus-jade text-surface hover:bg-accent-lotus-jade/90 text-xs font-bold transition-all shadow-sm flex items-center gap-1 disabled:opacity-50"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">task_alt</span>
+                          <span>Đã Nhận Được Hàng</span>
                         </button>
                       )}
 

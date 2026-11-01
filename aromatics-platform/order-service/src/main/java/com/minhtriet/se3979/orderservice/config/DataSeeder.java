@@ -133,6 +133,24 @@ public class DataSeeder implements CommandLineRunner {
                     .build());
             log.info("✅ Đã bổ sung mã giảm giá TINHTAM10 khớp Banner Trang Chủ!");
         }
+        if (couponRepository.findByCodeIgnoreCase("MOCHUONG10").isEmpty()) {
+            couponRepository.save(Coupon.builder()
+                    .code("MOCHUONG10")
+                    .name("Ưu đãi Mộc Hương - Giảm 10% đơn từ 200.000 ₫")
+                    .type(Coupon.CouponType.PERCENTAGE)
+                    .value(new BigDecimal("10.00"))
+                    .maxDiscountAmount(new BigDecimal("50000.00"))
+                    .minOrderValue(new BigDecimal("200000.00"))
+                    .maxUses(1000)
+                    .maxUsesPerUser(2)
+                    .usedCount(0)
+                    .startsAt(LocalDateTime.now().minusMonths(1))
+                    .expiresAt(LocalDateTime.now().plusYears(1))
+                    .isActive(true)
+                    .build());
+            log.info("✅ Đã bổ sung mã giảm giá MOCHUONG10 (Giảm 10% tối đa 50k)!");
+        }
+
     }
 
     private Map<String, Object> buildAddress(String name, String phone, String street, String ward, String district, String province) {

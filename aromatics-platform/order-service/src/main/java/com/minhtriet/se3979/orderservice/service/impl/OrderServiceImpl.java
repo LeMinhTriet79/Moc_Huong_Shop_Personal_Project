@@ -413,6 +413,39 @@ public class OrderServiceImpl implements OrderService {
         return OrderResponse.fromEntity(savedOrder);
     }
 
+    @Transactional
+    @Override
+    public OrderDetailResponse completeOrder(Long orderId, Long userId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng với id: " + orderId));
+
+        if (!order.getUserId().equals(userId)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Bạn không có quyền thao tác trên đơn hàng này!");
+        }
+
+        String currentStatus = normalizeStatus(order.getStatus());
+        if (!"DELIVERED".equalsIgnoreCase(currentStatus)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Chỉ có thể xác nhận hoàn tất khi đơn hàng đang ở trạng thái ĐÃ GIAO HÀNG (DELIVERED)!");
+        }
+
+        order.setStatus("COMPLETED");
+        Order saved = orderRepository.save(order);
+
+        OrderStatusHistory history = OrderStatusHistory.builder()
+                .order(saved)
+                .fromStatus(currentStatus)
+                .toStatus("COMPLETED")
+                .changedByType("CUSTOMER")
+                .changedById(userId)
+                .note("Khách hàng xác nhận đã nhận được hàng")
+                .build();
+        orderStatusHistoryRepository.save(history);
+
+        publishStatusChangedEvent(saved, currentStatus, "COMPLETED", "Khách hàng xác nhận đã nhận được hàng");
+        return mapToOrderDetail(saved);
+    }
+
+
     @Override
     public Page<OrderResponse> getCustomerOrders(Long userId, String status, Pageable pageable) {
         if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status.trim())) {

@@ -28,7 +28,7 @@ public class OrderController {
     private final OrderService orderService;
     private final OrderExportService orderExportService;
 
-    // 1. Đặt hàng (Checkout)
+    // 1. Khách hàng tạo đơn hàng (Checkout)
     @PostMapping("/checkout")
     public ResponseEntity<ApiResponse<OrderResponse>> checkout(@Valid @RequestBody CheckoutRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
@@ -73,7 +73,15 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success(response, "Hủy đơn hàng thành công"));
     }
 
-    // 5. Yêu cầu trả hàng / hoàn tiền (Khi đơn đã DELIVERED)
+    // 5. Khách hàng xác nhận đã nhận hàng (DELIVERED -> COMPLETED)
+    @PutMapping("/{orderId}/complete")
+    public ResponseEntity<ApiResponse<OrderDetailResponse>> completeOrder(@PathVariable Long orderId) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        OrderDetailResponse response = orderService.completeOrder(orderId, userId);
+        return ResponseEntity.ok(ApiResponse.success(response, "Xác nhận nhận hàng thành công"));
+    }
+
+    // 6. Yêu cầu trả hàng / hoàn tiền (Khi đơn đã DELIVERED)
     @PostMapping("/{orderId}/return-request")
     public ResponseEntity<ApiResponse<OrderResponse>> requestReturn(
             @PathVariable Long orderId,
@@ -91,7 +99,7 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success(response, "Đã gửi yêu cầu trả hàng/hoàn tiền"));
     }
 
-    // 6. Xuất hóa đơn bán hàng PDF (iText7)
+    // 7. Xuất hóa đơn bán hàng PDF (iText7)
     @GetMapping("/{orderId}/invoice-pdf")
     public ResponseEntity<byte[]> downloadInvoicePdf(@PathVariable Long orderId) {
         Long userId = SecurityUtils.getCurrentUserId();

@@ -7,17 +7,25 @@ management:
       probability: 1.0
 
 spring:
+  config:
+    import: optional:file:.env[.properties],optional:file:../.env[.properties]
   zipkin:
     base-url: ${MANAGEMENT_ZIPKIN_TRACING_ENDPOINT:http://localhost:9411}
   application:
     name: order-service
 
-  # Cấu hình kết nối MySQL
+  # Cấu hình kết nối PostgreSQL (Aiven)
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://pg-mochuong-trietleminh7979-se181979.i.aivencloud.com:15995/defaultdb?sslmode=require}
     username: ${SPRING_DATASOURCE_USERNAME:avnadmin}
     password: ${SPRING_DATASOURCE_PASSWORD:}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.postgresql.Driver}
+    hikari:
+      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:4}
+      minimum-idle: 2
+      idle-timeout: 30000
+      max-lifetime: 1800000
+      connection-timeout: 20000
 
   # Cấu hình JPA & Hibernate
   jpa:
@@ -65,4 +73,4 @@ vnpay:
   tmn-code: ${VNPAY_TMN_CODE:X776TT2O}
   hash-secret: ${VNPAY_HASH_SECRET:5TFWJWRWYJEU75B7FYIR2VVBU04HUORT}
   pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
-  return-url: ${VNPAY_RETURN_URL:http://localhost:8080/api/order/payment/vnpay-return}
+  return-url: ${VNPAY_RETURN_URL:http://localhost:3000/payment/vnpay-return}

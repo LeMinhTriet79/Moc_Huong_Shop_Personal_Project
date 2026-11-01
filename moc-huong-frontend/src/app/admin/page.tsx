@@ -191,6 +191,101 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
+            {/* 7-Day Revenue & Top Products Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Doanh Thu 7 Ngày Gần Nhất */}
+        <div className="lg:col-span-7 bg-surface rounded-3xl p-6 sm:p-8 border border-border-bamboo shadow-sm space-y-6">
+          <div className="flex items-center justify-between pb-3 border-b border-border-bamboo">
+            <div className="flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-primary text-[22px]">show_chart</span>
+              <h2 className="font-serif text-xl font-bold text-primary">Doanh Thu 7 Ngày Gần Nhất</h2>
+            </div>
+            <span className="text-xs font-mono text-text-wood-muted bg-surface-container-low px-2.5 py-1 rounded-lg border border-border-bamboo">
+              Đồng bộ tự động
+            </span>
+          </div>
+
+          <div className="space-y-4">
+            {(() => {
+              const days = stats?.revenueByDate && stats.revenueByDate.length > 0
+                ? stats.revenueByDate.slice(-7)
+                : [
+                    { date: 'T2', amount: 12500000 },
+                    { date: 'T3', amount: 18200000 },
+                    { date: 'T4', amount: 15400000 },
+                    { date: 'T5', amount: 22100000 },
+                    { date: 'T6', amount: 26800000 },
+                    { date: 'T7', amount: 34500000 },
+                    { date: 'CN', amount: 28900000 },
+                  ];
+              const maxAmount = Math.max(...days.map((d) => d.amount), 1);
+
+              return (
+                <div className="grid grid-cols-7 gap-2 sm:gap-4 items-end h-52 pt-6">
+                  {days.map((d, i) => {
+                    const heightPercent = Math.max(Math.round((d.amount / maxAmount) * 100), 12);
+                    return (
+                      <div key={i} className="flex flex-col items-center gap-2 h-full justify-end group">
+                        <span className="text-[10px] font-mono text-text-wood-muted opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                          {formatCurrency(d.amount)}
+                        </span>
+                        <div
+                          style={{ height: `${heightPercent}%` }}
+                          className="w-full max-w-[36px] bg-primary/80 group-hover:bg-primary rounded-t-xl transition-all shadow-sm"
+                        />
+                        <span className="text-xs font-mono font-bold text-primary mt-1">{d.date}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+
+        {/* Top 5 Sản Phẩm Bán Chạy */}
+        <div className="lg:col-span-5 bg-surface rounded-3xl p-6 sm:p-8 border border-border-bamboo shadow-sm space-y-5">
+          <div className="flex items-center justify-between pb-3 border-b border-border-bamboo">
+            <div className="flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-secondary text-[22px]">workspace_premium</span>
+              <h2 className="font-serif text-xl font-bold text-primary">Top 5 Bán Chạy</h2>
+            </div>
+            <Link href="/admin/products" className="text-xs text-secondary font-semibold hover:underline">
+              Kho hàng
+            </Link>
+          </div>
+
+          <div className="space-y-3.5">
+            {(() => {
+              const topList = stats?.topProducts && stats.topProducts.length > 0
+                ? stats.topProducts.slice(0, 5)
+                : [
+                    { productId: 1, productName: 'Vòng Trầm Hương 108 Hạt Tĩnh Tâm', totalQuantity: 86, totalRevenue: 103200000 },
+                    { productId: 2, productName: 'Nụ Trầm Hương Thượng Hạng Cao Cấp', totalQuantity: 74, totalRevenue: 33300000 },
+                    { productId: 3, productName: 'Nhang Trầm Không Tăm Hương Mộc', totalQuantity: 58, totalRevenue: 16240000 },
+                    { productId: 4, productName: 'Tinh Dầu Trầm Hương Tinh Khiết', totalQuantity: 42, totalRevenue: 35700000 },
+                    { productId: 5, productName: 'Lư Xông Trầm Gốm Men Hoả Biến', totalQuantity: 31, totalRevenue: 15190000 },
+                  ];
+
+              return topList.map((prod, index) => (
+                <div key={index} className="flex items-center justify-between p-3 rounded-2xl bg-bg-warm-sand/50 border border-border-bamboo/70 text-xs">
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center font-mono text-[11px]">
+                      {index + 1}
+                    </span>
+                    <div>
+                      <h4 className="font-serif font-bold text-text-ink-black line-clamp-1">{prod.productName}</h4>
+                      <p className="text-[11px] text-text-wood-muted mt-0.5 font-mono">Đã bán: {prod.totalQuantity} món</p>
+                    </div>
+                  </div>
+                  <span className="font-mono font-bold text-primary">{formatCurrency(prod.totalRevenue)}</span>
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
+      </div>
+
       {/* 2-Column Split: Daily Revenue & Low Stock Table */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left: Low Stock Items List (7 Cols) */}
@@ -274,10 +369,10 @@ export default function AdminDashboardPage() {
           <div className="space-y-3 text-xs">
             {[
               { name: 'api-gateway', port: '8080', desc: 'Spring Cloud Gateway Reactive' },
-              { name: 'identity-service', port: '8081', desc: 'Auth, RBAC, MySQL 3307' },
-              { name: 'catalog-service', port: '8082', desc: 'Products, Redisson Lock, MySQL 3308' },
-              { name: 'order-service', port: '8083', desc: 'Checkout, VNPay, MySQL 3309' },
-              { name: 'notification-service', port: '8084', desc: 'Kafka Consumer, MySQL 3310' },
+              { name: 'identity-service', port: '8081', desc: 'Auth, RBAC, Aiven PostgreSQL Cloud' },
+              { name: 'catalog-service', port: '8082', desc: 'Catalog, Full-Text, Aiven PostgreSQL Cloud' },
+              { name: 'order-service', port: '8083', desc: 'Checkout, VNPay, Aiven PostgreSQL Cloud' },
+              { name: 'notification-service', port: '8084', desc: 'Kafka Consumer, Aiven PostgreSQL Cloud' },
               { name: 'service-discovery', port: '8761', desc: 'Netflix Eureka Registry' },
             ].map((svc) => (
               <div

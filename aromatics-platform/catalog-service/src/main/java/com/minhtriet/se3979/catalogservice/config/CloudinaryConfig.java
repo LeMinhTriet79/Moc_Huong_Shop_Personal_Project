@@ -8,15 +8,12 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class CloudinaryConfig {
 
-    // Lấy cái chuỗi URL từ file application.yml ra
-    @Value("${cloudinary.url}")
+    @Value("${cloudinary.url:cloudinary://123456789012345:abcdefghijklmnopqrstuvwxyz1@mochuong}")
     private String cloudinaryUrl;
 
-    // Đánh dấu @Bean để Spring Boot biết đường mà khởi tạo thằng này
     @Bean
     public Cloudinary cloudinary() {
         Cloudinary cloudinary = new Cloudinary(cloudinaryUrl);
-        // Ép buộc dùng HTTPS cho an toàn
         cloudinary.config.secure = true;
         return cloudinary;
     }
