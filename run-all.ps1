@@ -5,10 +5,27 @@ Write-Host "==============================================================" -For
 Write-Host "       🌿 MỘC HƯƠNG SHOP - HỆ THỐNG THƯƠNG MẠI ĐIỆN TỬ 🌿       " -ForegroundColor Yellow
 Write-Host "==============================================================" -ForegroundColor Green
 Write-Host " Dang khoi dong 6 Microservices va Next.js 14 Frontend..." -ForegroundColor Cyan
+Write-Host " Database: Aiven Cloud PostgreSQL" -ForegroundColor DarkCyan
 Write-Host "==============================================================" -ForegroundColor Green
 Write-Host ""
 
 $rootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+# 0. Giai phong cac port neu co tien trinh zombie cu
+$ports = @(8761, 8080, 8081, 8082, 8083, 8084, 3000)
+foreach ($p in $ports) {
+    try {
+        $conns = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue
+        if ($conns) {
+            foreach ($conn in $conns) {
+                if ($conn.OwningProcess -gt 0) {
+                    Write-Host " [CLEANUP] Giai phong port $p (PID $($conn.OwningProcess))..." -ForegroundColor DarkYellow
+                    Stop-Process -Id $conn.OwningProcess -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }
+    } catch {}
+}
 
 # 1. Service Discovery
 Write-Host "[1/7] Dang khoi dong SERVICE-DISCOVERY (Eureka - Port 8761)..." -ForegroundColor Yellow
