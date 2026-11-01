@@ -11,6 +11,7 @@ public class ProductUpdateRequest {
     private String shortDescription;
     private String description;
     private String brand;
+    private List<String> tags;
     private Boolean isPublished;
 
     // THÔNG TIN BIẾN THỂ MẶC ĐỊNH (Variant)

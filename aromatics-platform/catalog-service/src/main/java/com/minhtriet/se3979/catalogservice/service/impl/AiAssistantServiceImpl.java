@@ -34,7 +34,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     @Value("${gemini.api-key:}")
     private String apiKey;
 
-    @Value("${gemini.model:gemini-1.5-flash}")
+    @Value("${gemini.model:gemini-3.5-flash}")
     private String model;
 
     @Value("${gemini.url:https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}}")
@@ -66,7 +66,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 "Bạn có kiến thức sâu rộng về Ngũ Hành Phong Thủy (Kim, Mộc, Thủy, Hỏa, Thổ), trầm hương tự nhiên, chuỗi 108 hạt, nụ trầm thác khói, nhang không tăm, tinh dầu xông.\n" +
                 "Hãy kết hợp tư vấn phong thủy và giới thiệu khéo léo các sản phẩm Mộc Hương dưới đây:\n" +
                 catalogContext + "\n" +
-                "Chính sách cửa hàng: Miễn phí vận chuyển toàn quốc cho đơn từ 300.000 ₫ (Mã FREESHIP0D), Mã giảm giá TINHTAM10 hoặc MOCHUONG10 giảm 10% đơn hàng.\n" +
+                "Chính sách cửa hàng: Miễn phí vận chuyển toàn quốc cho đơn từ 500.000 ₫ (hoặc từ 300.000 ₫ với Mã FREESHIP0D), Mã giảm giá TINHTAM10 hoặc MOCHUONG10 giảm 10% đơn hàng.\n" +
                 "Định dạng câu trả lời dùng Markdown đẹp mắt (gạch đầu dòng, in đậm tên sản phẩm).";
 
         // 4. Thử gọi Google Gemini API
@@ -212,11 +212,19 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     // HELPER: Gọi REST API Google Gemini
     // ==========================================
     private String callGeminiApi(String prompt, List<AiChatRequest.ChatMessageItem> history) throws Exception {
-        String endpoint = urlTemplate.replace("{model}", model).replace("{apiKey}", apiKey);
+        if (apiKey == null || apiKey.isBlank()) {
+            return null;
+        }
+
+        List<String> candidateModels = new ArrayList<>();
+        if (model != null && !model.isBlank()) {
+            candidateModels.add(model.trim());
+        }
+        if (!candidateModels.contains("gemini-3.5-flash")) candidateModels.add("gemini-3.5-flash");
+        if (!candidateModels.contains("gemini-3.5-flash-lite")) candidateModels.add("gemini-3.5-flash-lite");
+        if (!candidateModels.contains("gemini-3.8-flash")) candidateModels.add("gemini-3.8-flash");
 
         List<Map<String, Object>> contents = new ArrayList<>();
-
-        // Nạp history nếu có
         if (history != null && !history.isEmpty()) {
             for (AiChatRequest.ChatMessageItem item : history) {
                 String role = "model".equalsIgnoreCase(item.getRole()) ? "model" : "user";
@@ -226,8 +234,6 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 ));
             }
         }
-
-        // Tin nhắn hiện tại
         contents.add(Map.of(
                 "role", "user",
                 "parts", List.of(Map.of("text", prompt))
@@ -245,20 +251,38 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
                 .build();
 
-        String rawResponse = restClient.post()
-                .uri(endpoint)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(objectMapper.writeValueAsString(requestBody))
-                .retrieve()
-                .body(String.class);
+        String bodyJson = objectMapper.writeValueAsString(requestBody);
+        Exception lastException = null;
 
-        JsonNode root = objectMapper.readTree(rawResponse);
-        JsonNode candidates = root.path("candidates");
-        if (candidates.isArray() && !candidates.isEmpty()) {
-            JsonNode parts = candidates.get(0).path("content").path("parts");
-            if (parts.isArray() && !parts.isEmpty()) {
-                return parts.get(0).path("text").asText();
+        for (String candidateModel : candidateModels) {
+            try {
+                String endpoint = urlTemplate
+                        .replace("{model}", candidateModel)
+                        .replace("{apiKey}", apiKey.trim());
+
+                String rawResponse = restClient.post()
+                        .uri(endpoint)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(bodyJson)
+                        .retrieve()
+                        .body(String.class);
+
+                JsonNode root = objectMapper.readTree(rawResponse);
+                JsonNode candidates = root.path("candidates");
+                if (candidates.isArray() && !candidates.isEmpty()) {
+                    JsonNode parts = candidates.get(0).path("content").path("parts");
+                    if (parts.isArray() && !parts.isEmpty()) {
+                        return parts.get(0).path("text").asText();
+                    }
+                }
+            } catch (Exception ex) {
+                lastException = ex;
+                log.debug("Model {} không khả dụng ({}), chuyển sang candidate kế tiếp...", candidateModel, ex.getMessage());
             }
+        }
+
+        if (lastException != null) {
+            throw lastException;
         }
         return null;
     }
@@ -336,7 +360,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         // 5. Chính sách ship, khuyến mãi, bảo hành
         if (lower.contains("ship") || lower.contains("giảm giá") || lower.contains("mã") || lower.contains("vận chuyển") || lower.contains("khuyến mãi")) {
             return "🎁 **Chính Sách Ưu Đãi & Vận Chuyển Của Mộc Hương Shop:**\n\n" +
-                    "- **Miễn Phí Vận Chuyển:** Toàn quốc cho tất cả đơn hàng từ **300.000 ₫** (Mã `FREESHIP0D`).\n" +
+                    "- **Miễn Phí Vận Chuyển:** Toàn quốc cho đơn hàng từ **500.000 ₫** (hoặc từ **300.000 ₫** khi nhập mã `FREESHIP0D`).\n" +
                     "- **Mã Giảm Giá Tân Duyên:** Nhập mã `TINHTAM10` hoặc `MOCHUONG10` để được **giảm ngay 10%** cho đơn hàng từ 200.000 ₫.\n" +
                     "- **Thời Gian Giao Hàng:** Từ 1 - 2 ngày (Nội thành) và 2 - 4 ngày (Toàn quốc).\n" +
                     "- **Bảo Hành Trọn Đời:** Cam kết đền bù 200% nếu phát hiện trầm giả, trầm ép hương liệu độc hại.";

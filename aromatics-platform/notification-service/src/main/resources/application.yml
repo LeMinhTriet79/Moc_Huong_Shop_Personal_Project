@@ -1,5 +1,5 @@
 server:
-  port: 8084
+  port: ${PORT:${SERVER_PORT:8084}}
 
 management:
   tracing:
@@ -84,3 +84,4 @@ jwt:
 
 app:
   internal-secret: ${APP_INTERNAL_SECRET:MocHuongSecretKey2026InternalAuth}
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}

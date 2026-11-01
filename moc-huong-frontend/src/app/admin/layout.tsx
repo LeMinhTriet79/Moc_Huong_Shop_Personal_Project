@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -10,6 +10,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated, role, logout } = useAuthStore();
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    setIsMobileSidebarOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -55,22 +60,42 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-surface flex">
-      {/* Fixed Admin Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-72 bg-bg-agarwood-dark text-surface-bright z-50 flex flex-col justify-between shadow-2xl border-r border-border-bamboo/20">
+      {/* Mobile Backdrop */}
+      {isMobileSidebarOpen && (
+        <div
+          onClick={() => setIsMobileSidebarOpen(false)}
+          className="fixed inset-0 bg-bg-agarwood-dark/60 backdrop-blur-xs z-40 lg:hidden"
+        />
+      )}
+
+      {/* Responsive Admin Sidebar */}
+      <aside
+        className={`fixed left-0 top-0 h-full w-72 bg-bg-agarwood-dark text-surface-bright z-50 flex flex-col justify-between shadow-2xl border-r border-border-bamboo/20 transition-transform duration-300 ${
+          isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
         <div className="flex flex-col flex-1 overflow-y-auto">
           {/* Brand Header */}
-          <div className="p-6 flex items-center gap-3 border-b border-border-bamboo/15">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-secondary-fixed shadow-md border border-secondary/40">
-              <span className="material-symbols-outlined text-[24px]">spa</span>
-            </div>
-            <div>
-              <span className="block font-serif text-lg font-bold tracking-wider text-surface-bright leading-none">
-                MỘC HƯƠNG
-              </span>
-              <span className="block text-[10px] uppercase font-caption-meta text-secondary-fixed tracking-widest mt-1">
-                Cổng Quản Trị Am Trầm
-              </span>
-            </div>
+          <div className="p-6 flex items-center justify-between gap-3 border-b border-border-bamboo/15">
+            <Link href="/admin" className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-secondary-fixed shadow-md border border-secondary/40">
+                <span className="material-symbols-outlined text-[24px]">spa</span>
+              </div>
+              <div>
+                <span className="block font-serif text-lg font-bold tracking-wider text-surface-bright leading-none">
+                  MỘC HƯƠNG
+                </span>
+                <span className="block text-[10px] uppercase font-caption-meta text-secondary-fixed tracking-widest mt-1">
+                  Cổng Quản Trị Am Trầm
+                </span>
+              </div>
+            </Link>
+            <button
+              onClick={() => setIsMobileSidebarOpen(false)}
+              className="lg:hidden p-1.5 rounded-lg text-surface-variant hover:text-surface-bright"
+            >
+              <span className="material-symbols-outlined text-[20px]">close</span>
+            </button>
           </div>
 
           {/* Section: Operations */}
@@ -162,24 +187,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Main Container */}
-      <div className="pl-72 flex-1 flex flex-col min-h-screen">
+      <div className="lg:pl-72 flex-1 flex flex-col min-h-screen min-w-0">
         {/* Top Header */}
-        <header className="sticky top-0 z-40 h-16 bg-surface/90 backdrop-blur-xl border-b border-border-bamboo flex items-center justify-between px-8 shadow-sm">
+        <header className="sticky top-0 z-30 h-16 bg-surface/95 backdrop-blur-xl border-b border-border-bamboo flex items-center justify-between px-4 sm:px-8 shadow-sm">
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="lg:hidden p-2 rounded-xl bg-bg-warm-sand text-primary border border-border-bamboo"
+              aria-label="Mở menu quản trị"
+            >
+              <span className="material-symbols-outlined text-[20px]">menu</span>
+            </button>
             <span className="w-2 h-2 rounded-full bg-accent-lotus-jade animate-pulse" />
-            <span className="text-xs font-mono text-text-wood-muted">
+            <span className="text-xs font-mono text-text-wood-muted truncate">
               CỔNG QUẢN TRỊ MỘC HƯƠNG • MICROSERVICES BACKEND ONLINE
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Link
               href="/"
-              target="_blank"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-bg-warm-sand text-primary hover:bg-surface-container font-label-md text-xs font-semibold transition-colors border border-border-bamboo"
             >
               <span className="material-symbols-outlined text-[16px]">storefront</span>
-              <span>Xem Cửa Hàng</span>
+              <span className="hidden sm:inline">Về Cửa Hàng</span>
             </Link>
 
             <span className="px-2.5 py-1 rounded-full bg-primary text-secondary-fixed text-[11px] font-mono font-bold">
@@ -189,7 +220,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </header>
 
         {/* Admin Page Content */}
-        <div className="flex-1 p-6 lg:p-8 bg-surface-container-low/40">{children}</div>
+        <div className="flex-1 p-4 sm:p-6 lg:p-8 bg-surface-container-low/40 overflow-x-hidden">{children}</div>
       </div>
     </div>
   );

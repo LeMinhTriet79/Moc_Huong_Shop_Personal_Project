@@ -42,6 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Service
@@ -147,7 +148,10 @@ public class OrderServiceImpl implements OrderService {
                 .map(item -> item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal shippingFee = BigDecimal.valueOf(30000); // 30,000 đ mặc định
+        // Miễn phí vận chuyển cho đơn hàng có tạm tính >= 500.000 ₫ (đồng bộ 100% với CartDrawer & CheckoutPage)
+        BigDecimal shippingFee = subtotal.compareTo(BigDecimal.valueOf(500000)) >= 0
+                ? BigDecimal.ZERO
+                : BigDecimal.valueOf(30000);
         BigDecimal discountAmount = BigDecimal.ZERO;
 
         if (request.getCouponCode() != null && !request.getCouponCode().isBlank()) {
@@ -289,10 +293,14 @@ public class OrderServiceImpl implements OrderService {
             applicationEventPublisher.publishEvent(event);
         } else if (orderEventPublisher != null) {
             orderEventPublisher.publishOrderCreated(event);
-        }
-
-        if (kafkaTemplate != null) {
-            kafkaTemplate.send("order.created", event);
+        } else if (kafkaTemplate != null) {
+            CompletableFuture.runAsync(() -> {
+                try {
+                    kafkaTemplate.send("order.created", event);
+                } catch (Exception e) {
+                    log.warn("Kafka offline: {}", e.getMessage());
+                }
+            });
         }
         log.info("🛒 Đã phát sự kiện order.created cho đơn hàng: {}", orderCode);
 
@@ -320,10 +328,14 @@ public class OrderServiceImpl implements OrderService {
             applicationEventPublisher.publishEvent(cancelEvent);
         } else if (orderEventPublisher != null) {
             orderEventPublisher.publishOrderCancelled(cancelEvent);
-        }
-
-        if (kafkaTemplate != null) {
-            kafkaTemplate.send("order.cancelled", cancelEvent);
+        } else if (kafkaTemplate != null) {
+            CompletableFuture.runAsync(() -> {
+                try {
+                    kafkaTemplate.send("order.cancelled", cancelEvent);
+                } catch (Exception e) {
+                    log.warn("Kafka offline: {}", e.getMessage());
+                }
+            });
         }
     }
 
@@ -759,10 +771,14 @@ public class OrderServiceImpl implements OrderService {
             applicationEventPublisher.publishEvent(event);
         } else if (orderEventPublisher != null) {
             orderEventPublisher.publishOrderCancelled(event);
-        }
-
-        if (kafkaTemplate != null) {
-            kafkaTemplate.send("order.cancelled", event);
+        } else if (kafkaTemplate != null) {
+            CompletableFuture.runAsync(() -> {
+                try {
+                    kafkaTemplate.send("order.cancelled", event);
+                } catch (Exception e) {
+                    log.warn("Kafka offline: {}", e.getMessage());
+                }
+            });
         }
         log.info("🚨 KAFKA: Đã phát sự kiện order.cancelled cho đơn: {}", order.getOrderCode());
     }
@@ -783,10 +799,14 @@ public class OrderServiceImpl implements OrderService {
             applicationEventPublisher.publishEvent(event);
         } else if (orderEventPublisher != null) {
             orderEventPublisher.publishOrderStatusChanged(event);
-        }
-
-        if (kafkaTemplate != null) {
-            kafkaTemplate.send("order.status.changed", event);
+        } else if (kafkaTemplate != null) {
+            CompletableFuture.runAsync(() -> {
+                try {
+                    kafkaTemplate.send("order.status.changed", event);
+                } catch (Exception e) {
+                    log.warn("Kafka offline: {}", e.getMessage());
+                }
+            });
         }
         log.info("📣 KAFKA: Đã phát sự kiện order.status.changed cho đơn: {} ({} -> {})",
                 order.getOrderCode(), fromStatus, toStatus);

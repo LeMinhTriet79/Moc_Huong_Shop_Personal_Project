@@ -294,7 +294,7 @@ export default function OrderHistoryPage() {
                         </span>
 
                         {['DELIVERED', 'COMPLETED'].includes(order.status) && (
-                          reviewedItemIds.includes(item.id) ? (
+                          Boolean(item.reviewId) || reviewedItemIds.includes(item.id) ? (
                             <span className="px-2.5 py-1 rounded-full bg-accent-lotus-jade/15 text-accent-lotus-jade text-[11px] font-semibold flex items-center gap-1">
                               <span className="material-symbols-outlined text-[14px]">check_circle</span>
                               <span>✓ Đã Đánh Giá</span>

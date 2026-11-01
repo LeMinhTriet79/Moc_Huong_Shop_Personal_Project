@@ -17,8 +17,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -31,10 +33,10 @@ public class CartServiceImpl implements CartService {
     private final CatalogFeignClient catalogFeignClient;
 
     private static final String CART_KEY_PREFIX = "cart:user:";
+    private final Map<Long, Map<String, CartItem>> fallbackCartStore = new ConcurrentHashMap<>();
 
     @Override
     public void addToCart(Long userId, AddToCartRequest req) {
-        // 1. Kiểm tra dữ liệu thật từ catalog-service qua FeignClient (Fail Fast & Chống Hack giá)
         String realProductName = req.getProductName();
         String realVariantName = req.getVariantName();
         String realImageUrl = req.getProductImageUrl();
@@ -69,6 +71,26 @@ public class CartServiceImpl implements CartService {
         String key = CART_KEY_PREFIX + userId;
         String field = req.getProductId() + "_" + req.getVariantId();
 
+        // Luôn đồng bộ vào In-Memory Fallback để sẵn sàng khi Redis offline
+        Map<String, CartItem> userMemoryCart = fallbackCartStore.computeIfAbsent(userId, k -> new ConcurrentHashMap<>());
+        CartItem memItem = userMemoryCart.get(field);
+        if (memItem != null) {
+            memItem.setQuantity(memItem.getQuantity() + req.getQuantity());
+            memItem.setPrice(realPrice);
+        } else {
+            memItem = CartItem.builder()
+                    .productId(req.getProductId())
+                    .variantId(req.getVariantId())
+                    .productName(realProductName)
+                    .variantName(realVariantName)
+                    .productImageUrl(realImageUrl)
+                    .sku(realSku)
+                    .price(realPrice)
+                    .quantity(req.getQuantity())
+                    .build();
+        }
+        userMemoryCart.put(field, memItem);
+
         try {
             CartItem item;
             Object existingItemStr = redisTemplate.opsForHash().get(key, field);
@@ -76,26 +98,15 @@ public class CartServiceImpl implements CartService {
             if (existingItemStr != null) {
                 item = objectMapper.readValue(existingItemStr.toString(), CartItem.class);
                 item.setQuantity(item.getQuantity() + req.getQuantity());
-                item.setPrice(realPrice); // Cập nhật lại giá mới nhất
+                item.setPrice(realPrice);
             } else {
-                item = CartItem.builder()
-                        .productId(req.getProductId())
-                        .variantId(req.getVariantId())
-                        .productName(realProductName)
-                        .variantName(realVariantName)
-                        .productImageUrl(realImageUrl)
-                        .sku(realSku)
-                        .price(realPrice)
-                        .quantity(req.getQuantity())
-                        .build();
+                item = memItem;
             }
 
             redisTemplate.opsForHash().put(key, field, objectMapper.writeValueAsString(item));
             redisTemplate.expire(key, 30, TimeUnit.DAYS);
-
         } catch (Exception e) {
-            log.error("Lỗi khi thêm vào giỏ hàng Redis", e);
-            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "Lỗi hệ thống giỏ hàng: " + e.getMessage());
+            log.warn("⚠️ Redis không khả dụng khi thêm giỏ hàng, sử dụng In-Memory Cart Fallback cho userId={}: {}", userId, e.getMessage());
         }
     }
 
@@ -104,20 +115,26 @@ public class CartServiceImpl implements CartService {
         String key = CART_KEY_PREFIX + userId;
         String field = req.getProductId() + "_" + req.getVariantId();
 
+        Map<String, CartItem> userMemoryCart = fallbackCartStore.computeIfAbsent(userId, k -> new ConcurrentHashMap<>());
         if (req.getQuantity() <= 0) {
-            redisTemplate.opsForHash().delete(key, field);
+            userMemoryCart.remove(field);
+            try {
+                redisTemplate.opsForHash().delete(key, field);
+            } catch (Exception ignored) {
+            }
             return;
         }
 
         try {
             Object existingItemStr = redisTemplate.opsForHash().get(key, field);
-            if (existingItemStr == null) {
+            if (existingItemStr == null && !userMemoryCart.containsKey(field)) {
                 throw new AppException(HttpStatus.NOT_FOUND, "Món hàng không tồn tại trong giỏ hàng!");
             }
 
-            CartItem item = objectMapper.readValue(existingItemStr.toString(), CartItem.class);
+            CartItem item = existingItemStr != null
+                    ? objectMapper.readValue(existingItemStr.toString(), CartItem.class)
+                    : userMemoryCart.get(field);
 
-            // Kiểm tra tồn kho trước khi cập nhật
             try {
                 var feignRes = catalogFeignClient.getVariantInternalInfo(req.getVariantId());
                 if (feignRes.getBody() != null && feignRes.getBody().getData() != null) {
@@ -135,14 +152,17 @@ public class CartServiceImpl implements CartService {
             }
 
             item.setQuantity(req.getQuantity());
+            userMemoryCart.put(field, item);
             redisTemplate.opsForHash().put(key, field, objectMapper.writeValueAsString(item));
             redisTemplate.expire(key, 30, TimeUnit.DAYS);
-
         } catch (AppException ae) {
             throw ae;
         } catch (Exception e) {
-            log.error("Lỗi khi cập nhật giỏ hàng", e);
-            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "Lỗi khi cập nhật giỏ hàng: " + e.getMessage());
+            CartItem fallbackItem = userMemoryCart.get(field);
+            if (fallbackItem != null) {
+                fallbackItem.setQuantity(req.getQuantity());
+            }
+            log.warn("⚠️ Redis không khả dụng khi cập nhật giỏ hàng, đã cập nhật trên In-Memory Fallback: {}", e.getMessage());
         }
     }
 
@@ -156,21 +176,44 @@ public class CartServiceImpl implements CartService {
             for (Object value : entries.values()) {
                 cartItems.add(objectMapper.readValue(value.toString(), CartItem.class));
             }
+            if (!cartItems.isEmpty()) {
+                Map<String, CartItem> syncMap = new LinkedHashMap<>();
+                for (CartItem ci : cartItems) {
+                    syncMap.put(ci.getProductId() + "_" + ci.getVariantId(), ci);
+                }
+                fallbackCartStore.put(userId, new ConcurrentHashMap<>(syncMap));
+                return cartItems;
+            }
         } catch (Exception e) {
-            log.error("Lỗi khi lấy giỏ hàng từ Redis", e);
+            log.warn("⚠️ Redis không khả dụng khi đọc giỏ hàng, lấy từ In-Memory Fallback: {}", e.getMessage());
         }
-        return cartItems;
+
+        Map<String, CartItem> memCart = fallbackCartStore.get(userId);
+        return memCart != null ? new ArrayList<>(memCart.values()) : cartItems;
     }
 
     @Override
     public void removeCartItem(Long userId, Long productId, Long variantId) {
         String key = CART_KEY_PREFIX + userId;
         String field = productId + "_" + variantId;
-        redisTemplate.opsForHash().delete(key, field);
+        Map<String, CartItem> memCart = fallbackCartStore.get(userId);
+        if (memCart != null) {
+            memCart.remove(field);
+        }
+        try {
+            redisTemplate.opsForHash().delete(key, field);
+        } catch (Exception e) {
+            log.warn("⚠️ Redis offline khi xóa món hàng khỏi giỏ: {}", e.getMessage());
+        }
     }
 
     @Override
     public void clearCart(Long userId) {
-        redisTemplate.delete(CART_KEY_PREFIX + userId);
+        fallbackCartStore.remove(userId);
+        try {
+            redisTemplate.delete(CART_KEY_PREFIX + userId);
+        } catch (Exception e) {
+            log.warn("⚠️ Redis offline khi xóa toàn bộ giỏ hàng: {}", e.getMessage());
+        }
     }
 }

@@ -10,6 +10,7 @@ import { useCartStore } from '@/store/useCartStore';
 import { useWishlistStore } from '@/store/useWishlistStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import toast from 'react-hot-toast';
+import RichTextContent, { stripHtmlTags } from '@/components/common/RichTextContent';
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -332,9 +333,9 @@ export default function ProductDetailPage() {
             </div>
 
             {/* Description */}
-            <p className="font-body-base text-sm text-text-ink-black leading-relaxed">
-              {product.description}
-            </p>
+            <div className="font-body-base text-sm text-text-ink-black leading-relaxed">
+              <RichTextContent content={(product as any).shortDescription || stripHtmlTags(product.description)} />
+            </div>
 
             {/* Variant Pills Selector */}
             {product.variants && product.variants.length > 0 && (
@@ -486,7 +487,9 @@ export default function ProductDetailPage() {
                   <p className="font-mono text-primary font-semibold">{product.skuPrefix}</p>
                 </div>
               </div>
-              <p className="mt-4">{product.description}</p>
+              <div className="mt-4">
+                <RichTextContent content={product.description} />
+              </div>
             </div>
           )}
 

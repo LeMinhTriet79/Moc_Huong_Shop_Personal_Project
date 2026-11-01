@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 
 @Slf4j
@@ -45,9 +46,10 @@ public class ReviewServiceImpl implements ReviewService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu ID sản phẩm!");
         }
 
-        // 1. FAIL FAST: Mỗi order_item chỉ được đánh giá 1 lần (nếu có orderItemId)
-        if (request.getOrderItemId() != null && reviewRepository.existsByOrderItemId(request.getOrderItemId())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Bạn đã đánh giá cho sản phẩm này trong đơn hàng rồi!");
+        // 1. Nếu order_item đã được đánh giá thì cập nhật lại đánh giá hiện có
+        Optional<Review> existingReviewOpt = Optional.empty();
+        if (request.getOrderItemId() != null) {
+            existingReviewOpt = reviewRepository.findByOrderItemId(request.getOrderItemId());
         }
 
         Product product = productRepository.findById(productId)
@@ -67,17 +69,26 @@ public class ReviewServiceImpl implements ReviewService {
         List<String> uploadedCloudinaryIds = new ArrayList<>();
 
         try {
-            // 2. Tạo thực thể Review
-            Review review = Review.builder()
-                    .product(product)
-                    .variant(variant)
-                    .userId(userId)
-                    .orderItemId(request.getOrderItemId())
-                    .rating(request.getRating())
-                    .title(request.getTitle())
-                    .content(request.getContent())
-                    .isVisible(true)
-                    .build();
+            // 2. Tạo mới hoặc cập nhật thực thể Review
+            Review review;
+            if (existingReviewOpt.isPresent()) {
+                review = existingReviewOpt.get();
+                review.setRating(request.getRating());
+                if (request.getTitle() != null) review.setTitle(request.getTitle());
+                if (request.getContent() != null) review.setContent(request.getContent());
+                if (variant != null) review.setVariant(variant);
+            } else {
+                review = Review.builder()
+                        .product(product)
+                        .variant(variant)
+                        .userId(userId)
+                        .orderItemId(request.getOrderItemId())
+                        .rating(request.getRating())
+                        .title(request.getTitle())
+                        .content(request.getContent())
+                        .isVisible(true)
+                        .build();
+            }
 
             // 3. Xử lý up ảnh
             if (files != null && !files.isEmpty()) {

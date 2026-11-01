@@ -233,6 +233,7 @@ export default function AdminProductsPage() {
         sku: newVariantSku.trim(),
         variantName: newVariantName.trim(),
         price: newVariantPrice,
+        weightGram: newVariantWeight,
         weightGrams: newVariantWeight,
         initialStock: newVariantStock,
         attributes: { size: newVariantName.trim() },
@@ -241,6 +242,8 @@ export default function AdminProductsPage() {
       const vars = await catalogService.getVariants(variantDrawerProduct.id);
       setVariantsList(vars);
       setNewVariantName('');
+      setNewVariantSku(`${variantDrawerProduct.skuPrefix || 'MH'}-${Date.now().toString().slice(-4)}`);
+      loadData();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Không thể tạo biến thể');
     } finally {
@@ -255,6 +258,7 @@ export default function AdminProductsPage() {
       toast.success('Đã ẩn biến thể');
       const vars = await catalogService.getVariants(variantDrawerProduct.id);
       setVariantsList(vars);
+      loadData();
     } catch (e) {
       toast.error('Không thể ẩn biến thể');
     }

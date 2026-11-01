@@ -158,7 +158,7 @@ public class DataSeeder implements CommandLineRunner {
                     "tinh-dau-buoi-hong-sa-chanh-thanh-loc",
                     "Hương thanh mát sảng khoái thanh lọc không khí xua tan mệt mỏi", "Mộc Hương",
                     List.of(
-                            new VariantSeed("MH-TDBH-50ML", "Chai xông phòng 50ml", new BigDecimal("1350000"), new BigDecimal("165000"), 120, 60),
+                            new VariantSeed("MH-TDBH-50ML", "Chai xông phòng 50ml", new BigDecimal("135000"), new BigDecimal("165000"), 120, 60),
                             new VariantSeed("MH-TDBH-100ML", "Chai xông phòng 100ml", new BigDecimal("240000"), new BigDecimal("300000"), 220, 40)
                     ));
 
@@ -269,7 +269,7 @@ public class DataSeeder implements CommandLineRunner {
                 .name(name)
                 .slug(slug)
                 .shortDescription(shortDesc)
-                .description("<p>" + shortDesc + ". Tác phẩm thủ công tuyển chọn từ làng nghề truyền thống Mộc Hương Shop.</p>")
+                .description(shortDesc + ". Tác phẩm thủ công tuyển chọn từ làng nghề truyền thống Mộc Hương Shop.")
                 .brand(brand)
                 .tags(List.of("organic", "thu-cong", "thien-nhien", "tram-that"))
                 .isPublished(true)

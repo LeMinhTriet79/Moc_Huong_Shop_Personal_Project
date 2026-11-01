@@ -1,10 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import QueryProvider from '@/components/providers/QueryProvider';
-import Header from '@/components/common/Header';
-import Footer from '@/components/common/Footer';
-import CartDrawer from '@/components/cart/CartDrawer';
-import AiChatWidget from '@/components/common/AiChatWidget';
+import AppShell from '@/components/common/AppShell';
 
 export const metadata: Metadata = {
   title: 'MỘC HƯƠNG — Hương Từ Tâm • Mộc Từ Đất | Trầm Hương & Tinh Dầu Thiên Nhiên',
@@ -28,13 +25,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi">
-      <body className="bg-background text-text-ink-black antialiased selection:bg-secondary-fixed selection:text-text-ink-black min-h-screen flex flex-col justify-between">
+      <body className="bg-background text-text-ink-black antialiased selection:bg-secondary-fixed selection:text-text-ink-black min-h-screen">
         <QueryProvider>
-          <Header />
-          <div className="flex-1">{children}</div>
-          <Footer />
-          <CartDrawer />
-          <AiChatWidget />
+          <AppShell>{children}</AppShell>
         </QueryProvider>
       </body>
     </html>

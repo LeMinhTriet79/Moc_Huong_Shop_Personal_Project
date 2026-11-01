@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.text.DecimalFormat;
 import java.util.HashMap;
@@ -16,6 +17,9 @@ import java.util.Map;
 public class OrderEventListener {
 
     private final NotificationDispatcherService dispatcherService;
+
+    @Value("${app.frontend-url:http://localhost:3000}")
+    private String frontendUrl;
 
     // 1. Lắng nghe sự kiện Tạo đơn hàng
     @KafkaListener(topics = "order.created", groupId = "notification-group")
@@ -140,7 +144,7 @@ public class OrderEventListener {
             variables.put("token", token != null ? token : "");
 
             if ("VERIFY_EMAIL".equalsIgnoreCase(type)) {
-                String verificationLink = "http://localhost:8080/api/identity/auth/verify-email?token=" + token;
+                String verificationLink = frontendUrl + "/verify-email?token=" + token;
                 variables.put("verificationLink", verificationLink);
 
                 String idempotencyKey = "AUTH_VERIFY_" + email + "_" + token;
@@ -154,7 +158,7 @@ public class OrderEventListener {
                         variables
                 );
             } else if ("RESET_PASSWORD".equalsIgnoreCase(type)) {
-                String resetLink = "http://localhost:3000/reset-password?token=" + token;
+                String resetLink = frontendUrl + "/reset-password?token=" + token;
                 variables.put("resetLink", resetLink);
 
                 String idempotencyKey = "AUTH_RESET_" + email + "_" + token;

@@ -1,0 +1,78 @@
+services:
+  # ============================================================================
+  # 1. BACKEND MICROSERVICES PLATFORM (API Gateway + 5 Services + Embedded Redis)
+  # ============================================================================
+  - type: web
+    name: moc-huong-backend-gateway
+    runtime: docker
+    rootDir: aromatics-platform
+    dockerfilePath: ./Dockerfile.render-all-in-one
+    plan: starter
+    region: singapore
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: SPRING_DATASOURCE_URL
+        value: "jdbc:postgresql://pg-mochuong-trietleminh7979-se181979.i.aivencloud.com:15995/defaultdb?sslmode=require"
+      - key: SPRING_DATASOURCE_USERNAME
+        value: "avnadmin"
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: SPRING_DATASOURCE_DRIVER
+        value: "org.postgresql.Driver"
+      - key: SPRING_JPA_HIBERNATE_DDL_AUTO
+        value: "update"
+      - key: SPRING_JPA_DATABASE_PLATFORM
+        value: "org.hibernate.dialect.PostgreSQLDialect"
+      - key: SPRING_FLYWAY_ENABLED
+        value: "false"
+      - key: HIKARI_MAX_POOL_SIZE
+        value: "3"
+      - key: JWT_SECRET
+        value: "4b6a4a6e744e6b726466384a51356f5a774652417757367838536b5952674261"
+      - key: JWT_EXPIRATION
+        value: "900000"
+      - key: JWT_REFRESH_EXPIRATION
+        value: "604800000"
+      - key: APP_INTERNAL_SECRET
+        value: "MocHuongSecretKey2026InternalAuth"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: "gemini-3.5-flash"
+      - key: SPRING_DATA_REDIS_HOST
+        value: "localhost"
+      - key: SPRING_DATA_REDIS_PORT
+        value: "6379"
+      - key: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+        value: "http://localhost:8761/eureka/"
+      - key: CLOUDINARY_URL
+        sync: false
+      - key: MAIL_USERNAME
+        value: "letriet22042004@gmail.com"
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: VNPAY_TMN_CODE
+        value: "X776TT2O"
+      - key: VNPAY_HASH_SECRET
+        value: "5TFWJWRWYJEU75B7FYIR2VVBU04HUORT"
+      - key: VNPAY_RETURN_URL
+        value: "https://moc-huong-frontend.onrender.com/payment/vnpay-return"
+      - key: FRONTEND_URL
+        value: "https://moc-huong-frontend.onrender.com"
+
+  # ============================================================================
+  # 2. FRONTEND NEXT.JS 14 APP ROUTER (ĐÔNG PHƯƠNG THIỀN TỊNH)
+  # ============================================================================
+  - type: web
+    name: moc-huong-frontend
+    runtime: docker
+    rootDir: moc-huong-frontend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: singapore
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: NEXT_PUBLIC_BACKEND_URL
+        value: "https://moc-huong-backend-gateway.onrender.com"

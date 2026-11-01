@@ -301,6 +301,7 @@ public class ProductServiceImpl implements ProductService {
             if (request.getShortDescription() != null) product.setShortDescription(request.getShortDescription());
             if (request.getDescription() != null) product.setDescription(request.getDescription());
             if (request.getBrand() != null) product.setBrand(request.getBrand());
+            if (request.getTags() != null) product.setTags(request.getTags());
             if (request.getIsPublished() != null) product.setIsPublished(request.getIsPublished());
 
             if (product.getVariants() != null && !product.getVariants().isEmpty()) {

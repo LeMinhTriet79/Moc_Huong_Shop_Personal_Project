@@ -43,17 +43,17 @@ export default function Footer() {
             <Link href="/shop?categoryId=1" className="font-body-sm text-body-sm text-surface-variant hover:text-surface-bright transition-colors">
               Nhang Trầm Tự Nhiên
             </Link>
-            <Link href="/shop?categoryId=1" className="font-body-sm text-body-sm text-surface-variant hover:text-surface-bright transition-colors">
+            <Link href="/shop?categoryId=2" className="font-body-sm text-body-sm text-surface-variant hover:text-surface-bright transition-colors">
               Nụ Trầm Thác Khói
             </Link>
-            <Link href="/shop?categoryId=2" className="font-body-sm text-body-sm text-surface-variant hover:text-surface-bright transition-colors">
+            <Link href="/shop?categoryId=3" className="font-body-sm text-body-sm text-surface-variant hover:text-surface-bright transition-colors">
               Tinh Dầu Nguyên Chất
             </Link>
-            <Link href="/shop?categoryId=3" className="font-body-sm text-body-sm text-surface-variant hover:text-surface-bright transition-colors">
-              Vòng Tay Trầm Hương
-            </Link>
             <Link href="/shop?categoryId=4" className="font-body-sm text-body-sm text-surface-variant hover:text-surface-bright transition-colors">
-              Dụng Cụ Thưởng Trầm
+              Vòng Gỗ Phong Thủy
+            </Link>
+            <Link href="/shop?categoryId=5" className="font-body-sm text-body-sm text-surface-variant hover:text-surface-bright transition-colors">
+              Chuỗi 108 Hạt & Lư Xông
             </Link>
           </div>
 

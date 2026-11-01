@@ -18,6 +18,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     // 2. Chặn Spam: Kiểm tra xem món hàng này trong đơn hàng đã được đánh giá chưa?
     boolean existsByOrderItemId(Long orderItemId);
+    Optional<Review> findByOrderItemId(Long orderItemId);
 
     // =========================================================================
     // 3. KỸ THUẬT SPRING DATA PROJECTION: ÉP DATABASE TÍNH TOÁN
