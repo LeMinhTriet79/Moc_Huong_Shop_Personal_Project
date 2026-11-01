@@ -35,7 +35,7 @@ public class NotificationTemplate {
     @Column(name = "subject_template")
     private String subjectTemplate;
 
-    @Column(name = "body_template", nullable = false, columnDefinition = "LONGTEXT")
+    @Column(name = "body_template", nullable = false, columnDefinition = "TEXT")
     private String bodyTemplate;
 
     @JdbcTypeCode(SqlTypes.JSON)

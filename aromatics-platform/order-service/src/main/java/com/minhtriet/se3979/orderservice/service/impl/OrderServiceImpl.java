@@ -4,6 +4,7 @@ import com.minhtriet.se3979.orderservice.dto.event.OrderCancelledEvent;
 import com.minhtriet.se3979.orderservice.dto.event.OrderCreatedEvent;
 import com.minhtriet.se3979.orderservice.dto.event.OrderItemEventDto;
 import com.minhtriet.se3979.orderservice.dto.event.OrderStatusChangedEvent;
+import com.minhtriet.se3979.orderservice.dto.request.AddToCartRequest;
 import com.minhtriet.se3979.orderservice.dto.request.CheckoutRequest;
 import com.minhtriet.se3979.orderservice.dto.request.DeductRequest;
 import com.minhtriet.se3979.orderservice.dto.response.*;
@@ -76,6 +77,18 @@ public class OrderServiceImpl implements OrderService {
 
         // 2. Lấy giỏ hàng
         List<CartItem> cartItems = cartService.getCart(userId);
+        if (cartItems.isEmpty() && request.getItems() != null && !request.getItems().isEmpty()) {
+            for (CheckoutRequest.CheckoutItemRequest reqItem : request.getItems()) {
+                if (reqItem.getVariantId() != null && reqItem.getQuantity() != null && reqItem.getQuantity() > 0) {
+                    AddToCartRequest addReq = new AddToCartRequest();
+                    addReq.setProductId(reqItem.getProductId());
+                    addReq.setVariantId(reqItem.getVariantId());
+                    addReq.setQuantity(reqItem.getQuantity());
+                    cartService.addToCart(userId, addReq);
+                }
+            }
+            cartItems = cartService.getCart(userId);
+        }
         if (cartItems.isEmpty()) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Giỏ hàng của bạn đang trống!");
         }
@@ -546,11 +559,12 @@ public class OrderServiceImpl implements OrderService {
 
     @Transactional
     @Override
-    public void updateStaffNotes(Long orderId, String staffNotes) {
+    public OrderResponse updateStaffNotes(Long orderId, String staffNotes) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng ID: " + orderId));
         order.setStaffNotes(staffNotes);
-        orderRepository.save(order);
+        Order saved = orderRepository.save(order);
+        return OrderResponse.fromEntity(saved);
     }
 
     @Transactional
@@ -765,7 +779,7 @@ public class OrderServiceImpl implements OrderService {
                 .orderCode(order.getOrderCode())
                 .userId(order.getUserId())
                 .status(order.getStatus())
-                .shippingAddress(order.getShippingAddress())
+                .shippingAddress(OrderResponse.normalizeShippingAddress(order.getShippingAddress()))
                 .shippingFee(order.getShippingFee())
                 .subtotal(order.getSubtotal())
                 .discountAmount(order.getDiscountAmount())

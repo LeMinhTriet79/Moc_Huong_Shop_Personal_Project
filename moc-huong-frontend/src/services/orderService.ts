@@ -83,6 +83,11 @@ export const orderService = {
     return res.data.data;
   },
 
+  async verifyVnPayReturn(queryString: string): Promise<any> {
+    const res = await api.get<ApiResponse<any>>(`/api/order/payment/vnpay-return?${queryString}`);
+    return res.data.data;
+  },
+
   // STAFF / ADMIN APIs
   async getAdminOrders(params?: {
     keyword?: string;

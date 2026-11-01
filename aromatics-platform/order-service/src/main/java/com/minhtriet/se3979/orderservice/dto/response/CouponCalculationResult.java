@@ -16,11 +16,18 @@ public class CouponCalculationResult {
     private String couponCode;
     private BigDecimal discountAmount;
     private BigDecimal finalTotal;
+    
+    @JsonProperty("valid")
     private boolean isValid;
+    
     private String message;
 
     @JsonProperty("valid")
     public boolean isValid() {
+        return isValid;
+    }
+
+    public boolean getValid() {
         return isValid;
     }
 }

@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
 import java.util.Map;
 
 @Data
@@ -27,4 +28,16 @@ public class CheckoutRequest {
 
     @NotBlank(message = "idempotencyKey không được để trống")
     private String idempotencyKey;
+
+    private List<CheckoutItemRequest> items;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CheckoutItemRequest {
+        private Long productId;
+        private Long variantId;
+        private Integer quantity;
+    }
 }

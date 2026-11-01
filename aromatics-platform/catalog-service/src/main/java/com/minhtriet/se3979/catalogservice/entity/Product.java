@@ -38,7 +38,7 @@ public class Product {
     @Column(name = "short_description", length = 500)
     private String shortDescription;
 
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "TEXT")
     private String description;
 
     @Column(length = 100)
@@ -59,6 +59,9 @@ public class Product {
     @Column(name = "total_sold", nullable = false)
     @Builder.Default
     private Integer totalSold = 0;
+
+    @org.hibernate.annotations.Formula("(SELECT COALESCE(MIN(pv.price), 0) FROM product_variants pv WHERE pv.product_id = id)")
+    private BigDecimal basePrice;
 
     @Column(name = "is_published", nullable = false)
     @Builder.Default

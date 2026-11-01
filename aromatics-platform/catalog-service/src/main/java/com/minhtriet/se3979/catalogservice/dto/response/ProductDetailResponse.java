@@ -17,6 +17,7 @@ public class ProductDetailResponse {
     private Long id;
     private String name;
     private String slug;
+    private String skuPrefix;
     private String shortDescription;
     private String description;
     private String brand;

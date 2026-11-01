@@ -142,6 +142,11 @@ export default function CheckoutPage() {
         couponCode: appliedCoupon || undefined,
         notes: notes.trim() || undefined,
         idempotencyKey,
+        items: items.map((i) => ({
+          productId: i.productId,
+          variantId: i.variantId,
+          quantity: i.quantity,
+        })),
       });
 
       // Clear local cart

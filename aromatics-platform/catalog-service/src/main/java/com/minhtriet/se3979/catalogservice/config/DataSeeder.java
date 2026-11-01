@@ -3,13 +3,15 @@ package com.minhtriet.se3979.catalogservice.config;
 import com.minhtriet.se3979.catalogservice.entity.Category;
 import com.minhtriet.se3979.catalogservice.entity.Inventory;
 import com.minhtriet.se3979.catalogservice.entity.Product;
-import com.minhtriet.se3979.catalogservice.entity.ProductVariant;
 import com.minhtriet.se3979.catalogservice.entity.ProductImage;
+import com.minhtriet.se3979.catalogservice.entity.ProductVariant;
+import com.minhtriet.se3979.catalogservice.entity.Review;
 import com.minhtriet.se3979.catalogservice.repository.CategoryRepository;
 import com.minhtriet.se3979.catalogservice.repository.InventoryRepository;
 import com.minhtriet.se3979.catalogservice.repository.ProductImageRepository;
 import com.minhtriet.se3979.catalogservice.repository.ProductRepository;
 import com.minhtriet.se3979.catalogservice.repository.ProductVariantRepository;
+import com.minhtriet.se3979.catalogservice.repository.ReviewRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -18,8 +20,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Component
@@ -32,6 +35,7 @@ public class DataSeeder implements CommandLineRunner {
     private final ProductVariantRepository variantRepository;
     private final InventoryRepository inventoryRepository;
     private final ProductImageRepository productImageRepository;
+    private final ReviewRepository reviewRepository;
 
     @Override
     @Transactional
@@ -74,124 +78,223 @@ public class DataSeeder implements CommandLineRunner {
                     .isActive(true)
                     .build());
 
-            log.info("📦 Đang khởi tạo 10 Sản phẩm mẫu kèm đa biến thể và kho hàng...");
+            log.info("📦 Đang khởi tạo 12 Sản phẩm mẫu kèm đa biến thể và kho hàng...");
 
-            // 1. Nhang Trầm Kiến
-            createProductWithVariants(c1, "Nhang Trầm Hương Kiến Tự Nhiên", "nhang-tram-huong-kien",
-                    "Nhang trầm tự nhiên không tăm khói thanh nhẹ", "Mộc Hương",
+            // 1. Nhang Trầm Kiến (Khớp với OrderDataSeeder Đơn 1, 4, 6)
+            Product p1 = createProductWithVariants(c1, "Nhang Trầm Hương Kiến Tự Nhiên Thượng Hạng (30 Năm Tích Trầm)",
+                    "nhang-tram-huong-kien-30-nam",
+                    "Nhang trầm hương kiến tự nhiên 30 năm tích trầm, khói thanh ngọt sâu lắng", "Mộc Hương",
                     List.of(
-                            new VariantSeed("SKU-NHANG-40", "Hộp 40 nén (20cm)", new BigDecimal("180000"), new BigDecimal("220000"), 100, 50),
-                            new VariantSeed("SKU-NHANG-100", "Hộp 100 nén (30cm)", new BigDecimal("380000"), new BigDecimal("450000"), 250, 40)
+                            new VariantSeed("MH-NTH-50G", "Hộp 50g (~65 nén)", new BigDecimal("350000"), new BigDecimal("420000"), 100, 50),
+                            new VariantSeed("MH-NTH-100G", "Hộp 100g (~130 nén)", new BigDecimal("680000"), new BigDecimal("800000"), 200, 40),
+                            new VariantSeed("MH-NTH-200G-VIP", "Ống Sơn Mài Quà Biếu 200g", new BigDecimal("1950000"), new BigDecimal("2200000"), 400, 15)
                     ));
 
-            // 2. Nhang Tiên Phước
-            createProductWithVariants(c1, "Nhang Trầm Tiên Phước Thượng Hạng", "nhang-tram-tien-phuoc",
-                    "Trầm hương già năm vùng Tiên Phước Quảng Nam", "Mộc Hương",
+            // 2. Nhang Vòng Trầm Hương (Khớp với OrderDataSeeder Đơn 5)
+            Product p2 = createProductWithVariants(c2, "Nhang Vòng Trầm Hương Quảng Nam 24 Giờ Tịnh Tâm",
+                    "nhang-vong-tram-huong-quang-nam-24h",
+                    "Hương vòng trầm hương Quảng Nam cháy liên tục 24 giờ thư thái không gian am thiền", "Mộc Hương",
                     List.of(
-                            new VariantSeed("SKU-TP-50", "Hộp 50 nén cao cấp", new BigDecimal("320000"), new BigDecimal("380000"), 120, 30),
-                            new VariantSeed("SKU-TP-100", "Hộp 100 nén cao cấp", new BigDecimal("590000"), new BigDecimal("700000"), 250, 25)
+                            new VariantSeed("MH-NV24H-10V", "Hộp 10 vòng lớn", new BigDecimal("450000"), new BigDecimal("520000"), 200, 35),
+                            new VariantSeed("MH-NV24H-20V", "Hộp 20 vòng lớn", new BigDecimal("850000"), new BigDecimal("990000"), 400, 20)
                     ));
 
-            // 3. Trầm Nụ Thác Khói
-            createProductWithVariants(c2, "Trầm Nụ Thác Khói Cao Cấp", "tram-nu-thac-khoi",
-                    "Nụ trầm hương khói chảy ngược bồng bềnh như mây", "Mộc Hương",
+            // 3. Trầm Nụ Thác Khói (Khớp với OrderDataSeeder Đơn 1)
+            Product p3 = createProductWithVariants(c2, "Nụ Trầm Hương Khói Ngược Thác Liên Hoa (45 Nụ Cao Cấp)",
+                    "nu-tram-huong-khoi-nguoc-thac-lien-hoa",
+                    "Nụ trầm hương khói chảy ngược bồng bềnh như mây bồng bềnh non nước", "Mộc Hương",
                     List.of(
-                            new VariantSeed("SKU-NU-30", "Hộp 30 viên khói ngược", new BigDecimal("150000"), new BigDecimal("180000"), 80, 60),
-                            new VariantSeed("SKU-NU-60", "Hộp 60 viên tiết kiệm", new BigDecimal("270000"), new BigDecimal("320000"), 160, 45)
+                            new VariantSeed("MH-NT-45V", "Hộp 45 nụ", new BigDecimal("300000"), new BigDecimal("360000"), 90, 60),
+                            new VariantSeed("MH-NT-90V", "Hộp 90 nụ (Tặng đế đốt)", new BigDecimal("550000"), new BigDecimal("680000"), 180, 45)
                     ));
 
-            // 4. Hương Vòng Thư Giãn
-            createProductWithVariants(c2, "Hương Vòng Trầm Hương Thư Giãn 24H", "huong-vong-tram-huong-24h",
-                    "Hương vòng cháy liên tục 24 giờ thơm ấm cúng", "Mộc Hương",
+            // 4. Lư Xông Trầm Tử Sa (Khớp với OrderDataSeeder Đơn 5)
+            Product p4 = createProductWithVariants(c5, "Lư Xông Trầm Gốm Tử Sa Nghi Hưng Thủ Công Nắp Đồng Chạm Hoa Sen",
+                    "lu-xong-tram-gom-tu-sa-nghi-hung",
+                    "Lư gốm tử sa Nghi Hưng chế tác thủ công tinh xảo xông nụ xông vòng thanh khiết", "Mộc Hương",
                     List.of(
-                            new VariantSeed("SKU-VONG-10", "Hộp 10 khoanh lớn", new BigDecimal("220000"), new BigDecimal("260000"), 200, 35),
-                            new VariantSeed("SKU-VONG-20", "Hộp 20 khoanh lớn", new BigDecimal("390000"), new BigDecimal("480000"), 400, 20)
+                            new VariantSeed("MH-LX-TUSA-01", "Bộ lư tiêu chuẩn", new BigDecimal("420000"), new BigDecimal("500000"), 350, 30),
+                            new VariantSeed("MH-LX-TUSA-VIP", "Lễ Hộp Sơn Mài Kèm Lư & Nụ", new BigDecimal("790000"), new BigDecimal("950000"), 650, 15)
                     ));
 
-            // 5. Tinh Dầu Trầm Hương
-            createProductWithVariants(c3, "Tinh Dầu Trầm Hương Thiên Nhiên", "tinh-dau-tram-huong-nguyen-chat",
-                    "Tinh dầu chưng cất hơi nước từ trầm hương nguyên chất", "Mộc Hương",
+            // 5. Tinh Dầu Trầm Hương (Khớp với OrderDataSeeder Đơn 3)
+            Product p5 = createProductWithVariants(c3, "Tinh Dầu Trầm Hương Nguyên Chất Thượng Hạng (Agarwood Essential Oil)",
+                    "tinh-dau-tram-huong-nguyen-chat-thuong-hang",
+                    "Tinh dầu chưng cất hơi nước từ trầm hương tự nhiên hương thơm lưu giữ trường tồn", "Mộc Hương",
                     List.of(
-                            new VariantSeed("SKU-TD-TRAM-10ML", "Chai nhỏ giọt 10ml", new BigDecimal("450000"), new BigDecimal("550000"), 50, 25),
-                            new VariantSeed("SKU-TD-TRAM-30ML", "Chai nhỏ giọt 30ml", new BigDecimal("1150000"), new BigDecimal("1400000"), 100, 15)
+                            new VariantSeed("MH-TD-TH-10ML", "Lọ 10ml", new BigDecimal("270000"), new BigDecimal("320000"), 50, 40),
+                            new VariantSeed("MH-TD-TH-30ML", "Lọ 30ml", new BigDecimal("680000"), new BigDecimal("850000"), 100, 25)
                     ));
 
-            // 6. Tinh Dầu Đàn Hương
-            createProductWithVariants(c3, "Tinh Dầu Đàn Hương Ấn Độ (Sandalwood)", "tinh-dau-dan-huong-an-do",
-                    "Hương gỗ ấm ngọt nồng nàn thanh tịnh tâm hồn", "Mộc Hương",
+            // 6. Vòng Tay Trầm Hương 108 Hạt (Khớp với OrderDataSeeder Đơn 2)
+            Product p6 = createProductWithVariants(c4, "Vòng Tay Trầm Hương Tốc Kiến Tự Nhiên 108 Hạt Phối Charm Sen Vàng",
+                    "vong-tay-tram-huong-toc-kien-108-hat-charm-sen",
+                    "Vòng trầm tốc kiến vân dầu tự nhiên phối charm hoa sen mạ vàng cát tường", "Mộc Hương",
                     List.of(
-                            new VariantSeed("SKU-TD-DAN-10ML", "Chai nhỏ giọt 10ml", new BigDecimal("380000"), new BigDecimal("450000"), 50, 30),
-                            new VariantSeed("SKU-TD-DAN-30ML", "Chai nhỏ giọt 30ml", new BigDecimal("980000"), new BigDecimal("1200000"), 100, 20)
+                            new VariantSeed("MH-VT108-6MM", "Size hạt 6mm (Nữ)", new BigDecimal("2850000"), new BigDecimal("3200000"), 30, 20),
+                            new VariantSeed("MH-VT108-8MM", "Size hạt 8mm (Nam)", new BigDecimal("3450000"), new BigDecimal("3900000"), 45, 15)
                     ));
 
-            // 7. Tinh Dầu Bưởi Hồng & Sả Chanh
-            createProductWithVariants(c3, "Tinh Dầu Bưởi Hồng & Sả Chanh Xông Phòng", "tinh-dau-buoi-hong-sa-chanh",
-                    "Thư giãn tinh thần, thanh lọc không khí xua đuổi côn trùng", "Mộc Hương",
+            // 7. Nhang Trầm Hương Không Tăm
+            createProductWithVariants(c1, "Nhang Trầm Hương Không Tăm Thư Giãn Phòng Trà",
+                    "nhang-tram-khong-tam-phong-tra",
+                    "Nhang không tăm thanh khiết dành riêng cho thưởng trà và đọc sách", "Mộc Hương",
                     List.of(
-                            new VariantSeed("SKU-TD-SA-50ML", "Chai xông phòng 50ml", new BigDecimal("120000"), new BigDecimal("150000"), 120, 50),
-                            new VariantSeed("SKU-TD-SA-100ML", "Chai xông phòng 100ml", new BigDecimal("210000"), new BigDecimal("260000"), 220, 40)
+                            new VariantSeed("MH-NKT-40N", "Ống tre 40 nén", new BigDecimal("220000"), new BigDecimal("260000"), 60, 45),
+                            new VariantSeed("MH-NKT-100N-VIP", "Hộp gỗ cao cấp 100 nén", new BigDecimal("520000"), new BigDecimal("620000"), 150, 25)
                     ));
 
-            // 8. Vòng Tay Trầm Hương 108 Hạt
-            createProductWithVariants(c4, "Vòng Tay Trầm Hương Tốc Kiến 108 Hạt", "vong-tay-tram-huong-toc-kien-108",
-                    "Vòng trầm tốc kiến vân dầu tự nhiên thơm vĩnh viễn", "Mộc Hương",
+            // 8. Tinh Dầu Đàn Hương
+            createProductWithVariants(c3, "Tinh Dầu Đàn Hương Mysore Nguyên Chất (Sandalwood Oil)",
+                    "tinh-dau-dan-huong-mysore-nguyen-chat",
+                    "Hương gỗ đàn hương ấm nồng ngọt ngào xua tan lo âu phiền muộn", "Mộc Hương",
                     List.of(
-                            new VariantSeed("SKU-VT-108-6MM", "Chuỗi 108 hạt size 6mm", new BigDecimal("650000"), new BigDecimal("850000"), 30, 20),
-                            new VariantSeed("SKU-VT-108-8MM", "Chuỗi 108 hạt size 8mm", new BigDecimal("950000"), new BigDecimal("1200000"), 45, 15)
+                            new VariantSeed("MH-TDDH-10ML", "Chai nhỏ giọt 10ml", new BigDecimal("390000"), new BigDecimal("480000"), 50, 35),
+                            new VariantSeed("MH-TDDH-30ML", "Chai nhỏ giọt 30ml", new BigDecimal("990000"), new BigDecimal("1250000"), 100, 20)
                     ));
 
-            // 9. Vòng Gỗ Bách Xanh Chìm Nước
-            createProductWithVariants(c4, "Vòng Gỗ Bách Xanh Chìm Nước Mộc Châu", "vong-go-bach-xanh-chim-nuoc",
-                    "Bách xanh chìm nước mùi thơm ngọt kẹo phong thủy vượng khí", "Mộc Hương",
+            // 9. Tinh Dầu Bưởi Hồng & Sả Chanh
+            createProductWithVariants(c3, "Tinh Dầu Bưởi Hồng & Sả Chanh Thanh Lọc Không Khí",
+                    "tinh-dau-buoi-hong-sa-chanh-thanh-loc",
+                    "Hương thanh mát sảng khoái thanh lọc không khí xua tan mệt mỏi", "Mộc Hương",
                     List.of(
-                            new VariantSeed("SKU-BX-12MM", "Vòng hạt tròn 12mm (Nam/Nữ)", new BigDecimal("350000"), new BigDecimal("450000"), 40, 25),
-                            new VariantSeed("SKU-BX-14MM", "Vòng hạt tròn 14mm (Nam)", new BigDecimal("420000"), new BigDecimal("550000"), 55, 20)
+                            new VariantSeed("MH-TDBH-50ML", "Chai xông phòng 50ml", new BigDecimal("1350000"), new BigDecimal("165000"), 120, 60),
+                            new VariantSeed("MH-TDBH-100ML", "Chai xông phòng 100ml", new BigDecimal("240000"), new BigDecimal("300000"), 220, 40)
                     ));
 
-            // 10. Lư Xông Trầm Gốm Sứ Men Hỏa Biến
-            createProductWithVariants(c5, "Lư Xông Trầm Hương Men Hỏa Biến Nghệ Thuật", "lu-xong-tram-men-hoa-bien",
-                    "Lư gốm sứ Bát Tràng men hỏa biến nắp đồng xông nụ xông vòng", "Mộc Hương",
+            // 10. Vòng Gỗ Bách Xanh Chìm Nước
+            createProductWithVariants(c4, "Vòng Gỗ Bách Xanh Chìm Nước Mộc Châu Thơm Ngọt",
+                    "vong-go-bach-xanh-chim-nuoc-moc-chau",
+                    "Bách xanh chìm nước mùi thơm ngọt kẹo phong thủy vượng khí tài lộc", "Mộc Hương",
                     List.of(
-                            new VariantSeed("SKU-LU-XANH", "Màu Xanh Cổ Bích", new BigDecimal("240000"), new BigDecimal("300000"), 350, 30),
-                            new VariantSeed("SKU-LU-NAU", "Màu Nâu Trầm Đất", new BigDecimal("240000"), new BigDecimal("300000"), 350, 30)
+                            new VariantSeed("MH-VGBX-12MM", "Vòng hạt tròn 12mm", new BigDecimal("380000"), new BigDecimal("450000"), 40, 30),
+                            new VariantSeed("MH-VGBX-14MM", "Vòng hạt tròn 14mm", new BigDecimal("460000"), new BigDecimal("550000"), 55, 25)
                     ));
 
-            log.info("✅ Đã khởi tạo hoàn tất 5 Danh mục và 10 Sản phẩm đa biến thể cho Mộc Hương Shop!");
+            // 11. Vòng Gỗ Tử Đàn Tiểu Diệp
+            createProductWithVariants(c4, "Vòng Tay Gỗ Tử Đàn Tiểu Diệp Ấn Độ Phong Thủy Vượng Khí",
+                    "vong-tay-go-tu-dan-tieu-diep-an-do",
+                    "Vua của các loài gỗ mang lại bình an hanh thông vượng khí cho gia chủ", "Mộc Hương",
+                    List.of(
+                            new VariantSeed("MH-VGTD-10MM", "Vòng hạt 10mm (Nữ/Nam)", new BigDecimal("890000"), new BigDecimal("1100000"), 35, 20),
+                            new VariantSeed("MH-VGTD-12MM", "Vòng hạt 12mm (Nam)", new BigDecimal("1250000"), new BigDecimal("1500000"), 50, 15)
+                    ));
+
+            // 12. Chuỗi Niệm Phật 108 Hạt Gỗ Mun Sừng
+            createProductWithVariants(c5, "Chuỗi Niệm Phật 108 Hạt Gỗ Mun Sừng Đen Tuyền Thiền Định",
+                    "chuoi-niem-phat-108-hat-go-mun-sung",
+                    "Gỗ mun sừng tự nhiên đen tuyền bóng mượt chuỗi hạt trợ duyên hành trì thiền định", "Mộc Hương",
+                    List.of(
+                            new VariantSeed("MH-CH108-MUN-6MM", "Chuỗi 108 hạt size 6mm", new BigDecimal("580000"), new BigDecimal("700000"), 30, 25),
+                            new VariantSeed("MH-CH108-MUN-8MM", "Chuỗi 108 hạt size 8mm", new BigDecimal("790000"), new BigDecimal("950000"), 45, 20)
+                    ));
+
+            // 2. Seed Đánh giá mẫu liên kết đúng với userId=3,4,5 và orderId=1,4
+            seedReviews(p1, p2, p3, p6);
+
+            log.info("✅ Đã khởi tạo hoàn tất 5 Danh mục, 12 Sản phẩm đa biến thể và các đánh giá mẫu cho Mộc Hương Shop!");
         }
     }
 
-    private void createProductWithVariants(Category cat, String name, String slug, String shortDesc, String brand, List<VariantSeed> variants) {
+    private void seedReviews(Product p1, Product p2, Product p3, Product p6) {
+        if (reviewRepository.count() == 0) {
+            List<Review> reviews = new ArrayList<>();
+
+            // Review 1: Khách hàng Nguyễn Minh Triết (userId=3) cho sản phẩm 1 từ Đơn 1
+            reviews.add(Review.builder()
+                    .product(p1)
+                    .userId(3L)
+                    .orderItemId(1L)
+                    .rating(5)
+                    .title("Hương trầm thơm ngọt sâu, thư thái tâm hồn")
+                    .content("Nhang thơm dịu không bị khét khói, thắp trong phòng trà cảm giác rất thanh tịnh. Đóng gói hộp rất trang nhã.")
+                    .adminReply("Mộc Hương chân thành cảm ơn quý khách. Kính chúc quý khách thân tâm thường an lạc!")
+                    .adminRepliedAt(LocalDateTime.now().minusDays(1))
+                    .isVisible(true)
+                    .build());
+
+            // Review 2: Khách hàng Trần Thanh Hà (userId=4) cho sản phẩm 1 từ Đơn 4
+            reviews.add(Review.builder()
+                    .product(p1)
+                    .userId(4L)
+                    .orderItemId(4L)
+                    .rating(5)
+                    .title("Lễ hộp Sơn Mài đem biếu người lớn rất ưng ý")
+                    .content("Ống sơn mài làm rất tỉ mỉ, sang trọng. Hương trầm kiến 30 năm đốt lên thơm dịu khắp cả tầng phòng khách.")
+                    .adminReply("Dạ Mộc Hương rất vui vì lễ hộp đã làm hài lòng quý gia đình ạ.")
+                    .adminRepliedAt(LocalDateTime.now().minusDays(3))
+                    .isVisible(true)
+                    .build());
+
+            // Review 3: Khách hàng Lê Hoàng Nam (userId=5) cho sản phẩm 2
+            reviews.add(Review.builder()
+                    .product(p2)
+                    .userId(5L)
+                    .rating(5)
+                    .title("Hương vòng 24 giờ thơm êm ái")
+                    .content("Vòng hương cháy đều và bền, khói tỏa nhẹ không cay mắt. Đã ủng hộ shop nhiều lần.")
+                    .isVisible(true)
+                    .build());
+
+            // Review 4: Khách hàng Nguyễn Minh Triết (userId=3) cho sản phẩm 3 từ Đơn 1
+            reviews.add(Review.builder()
+                    .product(p3)
+                    .userId(3L)
+                    .orderItemId(2L)
+                    .rating(5)
+                    .title("Thác khói chảy đẹp như mây bồng bềnh")
+                    .content("Khói trầm chảy ngược rất mịn, ngắm nhìn sau một ngày làm việc thấy nhẹ nhõm hẳn. Rất đáng tiền!")
+                    .isVisible(true)
+                    .build());
+
+            // Review 5: Khách hàng Nguyễn Minh Triết (userId=3) cho sản phẩm 6 từ Đơn 2
+            reviews.add(Review.builder()
+                    .product(p6)
+                    .userId(3L)
+                    .rating(5)
+                    .title("Vòng trầm tốc kiến vân dầu rất đẹp")
+                    .content("Vòng thơm ngọt tự nhiên, đeo một thời gian lên nước bóng rất sang. Charm hoa sen tinh tế.")
+                    .adminReply("Chúc quý khách luôn được năng lượng an lành từ chuỗi trầm hương thiên nhiên hộ trì ạ!")
+                    .adminRepliedAt(LocalDateTime.now().minusDays(2))
+                    .isVisible(true)
+                    .build());
+
+            reviewRepository.saveAll(reviews);
+        }
+    }
+
+    private Product createProductWithVariants(Category cat, String name, String slug, String shortDesc, String brand, List<VariantSeed> variants) {
         Product p = Product.builder()
                 .category(cat)
                 .name(name)
                 .slug(slug)
                 .shortDescription(shortDesc)
-                .description("<p>" + shortDesc + ". Sản phẩm tuyển chọn thủ công từ Mộc Hương Shop.</p>")
+                .description("<p>" + shortDesc + ". Tác phẩm thủ công tuyển chọn từ làng nghề truyền thống Mộc Hương Shop.</p>")
                 .brand(brand)
-                .tags(List.of("organic", "thu-cong", "thien-nhien"))
+                .tags(List.of("organic", "thu-cong", "thien-nhien", "tram-that"))
                 .isPublished(true)
                 .isActive(true)
                 .averageRating(BigDecimal.valueOf(5.0))
-                .totalReviews(1)
-                .totalSold(12)
+                .totalReviews(variants.size() > 2 ? 2 : 1)
+                .totalSold(18)
                 .build();
         Product savedProduct = productRepository.save(p);
 
-        // Lưu 2 ảnh chất lượng cao mẫu
+        // Ảnh mẫu chất lượng cao phân chia theo loại sản phẩm
         String img1;
         String img2;
         if (slug.contains("nhang")) {
-            img1 = "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?w=800";
+            img1 = "https://images.unsplash.com/photo-1602928321679-560bb453f190?w=800";
             img2 = "https://images.unsplash.com/photo-1544816155-12df9643f363?w=800";
-        } else if (slug.contains("nu") || slug.contains("vong-tram")) {
-            img1 = "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800";
-            img2 = "https://images.unsplash.com/photo-1515377905703-c4788e51af15?w=800";
+        } else if (slug.contains("nu") || slug.contains("vong-tram") || slug.contains("huong-vong")) {
+            img1 = "https://images.unsplash.com/photo-1515377905703-c4788e51af15?w=800";
+            img2 = "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800";
         } else if (slug.contains("tinh-dau")) {
             img1 = "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?w=800";
             img2 = "https://images.unsplash.com/photo-1617897903246-719242758050?w=800";
         } else if (slug.contains("vong-tay") || slug.contains("vong-go")) {
-            img1 = "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=800";
-            img2 = "https://images.unsplash.com/photo-1611080626919-7cf5a9dbab5b?w=800";
+            img1 = "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=800";
+            img2 = "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=800";
         } else {
             img1 = "https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=800";
             img2 = "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=800";
@@ -237,6 +340,8 @@ public class DataSeeder implements CommandLineRunner {
                     .build();
             inventoryRepository.save(inv);
         }
+
+        return savedProduct;
     }
 
     private record VariantSeed(String sku, String name, BigDecimal price, BigDecimal originalPrice, Integer weightGram, Integer stock) {}

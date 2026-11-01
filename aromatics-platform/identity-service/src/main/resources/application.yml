@@ -14,17 +14,21 @@ spring:
 
   # Cấu hình kết nối MySQL
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/identity_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true}
-    username: ${SPRING_DATASOURCE_USERNAME:root}
-    password: ${SPRING_DATASOURCE_PASSWORD:12345}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://pg-mochuong-trietleminh7979-se181979.i.aivencloud.com:15995/defaultdb?sslmode=require}
+    username: ${SPRING_DATASOURCE_USERNAME:avnadmin}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.postgresql.Driver}
 
   # Cấu hình JPA & Hibernate
   jpa:
     hibernate:
-      ddl-auto: validate # Để Flyway tự quản lý bảng, JPA chỉ validate
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
     show-sql: true
     properties:
-      hibernate.dialect: org.hibernate.dialect.MySQLDialect
+      hibernate.dialect: ${SPRING_JPA_DATABASE_PLATFORM:org.hibernate.dialect.PostgreSQLDialect}
+
+  flyway:
+    enabled: ${SPRING_FLYWAY_ENABLED:false}
 
   # Cấu hình Redis
   data:

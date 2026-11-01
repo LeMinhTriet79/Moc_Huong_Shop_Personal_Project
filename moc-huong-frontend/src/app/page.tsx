@@ -206,9 +206,9 @@ export default function HomePage() {
     activeCategoryFilter === 'all'
       ? featuredProducts
       : featuredProducts.filter((p) => {
-          if (activeCategoryFilter === 'nhang') return p.categoryId === 1;
-          if (activeCategoryFilter === 'tinhdau') return p.categoryId === 2;
-          if (activeCategoryFilter === 'vonggo') return p.categoryId === 3;
+          if (activeCategoryFilter === 'nhang') return p.categoryId === 1 || p.categoryId === 2;
+          if (activeCategoryFilter === 'tinhdau') return p.categoryId === 3;
+          if (activeCategoryFilter === 'vonggo') return p.categoryId === 4 || p.categoryId === 5;
           return true;
         });
 
@@ -377,25 +377,25 @@ export default function HomePage() {
               {
                 title: 'Trầm Nụ & Thác Khói',
                 count: '12 Mẫu thác',
-                href: '/shop?categoryId=1',
+                href: '/shop?categoryId=2',
                 image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=500',
               },
               {
                 title: 'Tinh Dầu Thiên Nhiên',
                 count: '15 Hương hoa cỏ',
-                href: '/shop?categoryId=2',
+                href: '/shop?categoryId=3',
                 image: 'https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?w=500',
               },
               {
                 title: 'Vòng Gỗ Phong Thủy',
                 count: '24 Dáng hạt',
-                href: '/shop?categoryId=3',
+                href: '/shop?categoryId=4',
                 image: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=500',
               },
               {
                 title: 'Chuỗi Hạt Thiền 108',
                 count: '10 Mẫu niệm châu',
-                href: '/shop?categoryId=3',
+                href: '/shop?categoryId=5',
                 image: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=500',
               },
             ].map((cat, idx) => (

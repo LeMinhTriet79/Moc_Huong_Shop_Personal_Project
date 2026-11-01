@@ -18,6 +18,8 @@ public class ProductResponse {
     private String shortDescription;
     private String description;
     private String brand;
+    private String skuPrefix;
+    private List<String> tags;
     private Long categoryId;
     private String categoryName;
     private BigDecimal averageRating;

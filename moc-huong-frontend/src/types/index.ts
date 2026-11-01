@@ -118,7 +118,7 @@ export interface ProductResponse {
   categoryName?: string;
   name: string;
   slug: string;
-  skuPrefix: string;
+  skuPrefix?: string;
   description: string;
   brand: string;
   basePrice: number;
@@ -236,16 +236,26 @@ export type PaymentStatus = 'UNPAID' | 'PAID' | 'FAILED' | 'REFUNDED';
 
 export interface OrderShippingAddress {
   recipientName: string;
+  recipient_name?: string;
   phoneNumber: string;
+  recipientPhone?: string;
+  recipient_phone?: string;
   streetAddress: string;
+  street_address?: string;
   ward: string;
+  wardName?: string;
+  ward_name?: string;
   district: string;
+  districtName?: string;
+  district_name?: string;
   province: string;
+  provinceName?: string;
+  province_name?: string;
 }
 
 export interface OrderItemResponse {
   id: number;
-  orderId: number;
+  orderId?: number;
   productId: number;
   variantId: number;
   sku: string;
@@ -253,9 +263,11 @@ export interface OrderItemResponse {
   variantName: string;
   productImageUrl: string;
   unitPrice: number;
-  discountAmount: number;
+  discountAmount?: number;
   quantity: number;
+  subtotal?: number;
   totalPrice: number;
+  reviewId?: number;
 }
 
 export interface OrderStatusHistoryResponse {
@@ -314,6 +326,7 @@ export interface CheckoutRequest {
   couponCode?: string;
   notes?: string;
   idempotencyKey: string;
+  items?: { productId?: number; variantId: number; quantity: number }[];
 }
 
 // Admin Dashboard KPI

@@ -29,7 +29,7 @@ public class OrderStatusHistory {
     @Column(name = "to_status", nullable = false, length = 30)
     private String toStatus;
 
-    @Column(name = "changed_by_type", nullable = false, columnDefinition = "enum('CUSTOMER','STAFF','ADMIN','SYSTEM')")
+    @Column(name = "changed_by_type", nullable = false, length = 20)
     private String changedByType; // CUSTOMER, STAFF, ADMIN, SYSTEM
 
     @Column(name = "changed_by_id")

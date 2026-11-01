@@ -3,6 +3,7 @@
 import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { orderService } from '@/services/orderService';
 
 function VNPayReturnContent() {
   const searchParams = useSearchParams();
@@ -18,6 +19,15 @@ function VNPayReturnContent() {
   // Extract order code if possible
   const orderCodeMatch = orderInfo.match(/MH-[A-Za-z0-9_-]+/);
   const orderCode = orderCodeMatch ? orderCodeMatch[0] : txnRef;
+
+  useEffect(() => {
+    const queryStr = searchParams.toString();
+    if (queryStr) {
+      orderService.verifyVnPayReturn(queryStr).catch((err) => {
+        console.warn('VNPay return verification warning:', err);
+      });
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (isSuccess && orderCode) {

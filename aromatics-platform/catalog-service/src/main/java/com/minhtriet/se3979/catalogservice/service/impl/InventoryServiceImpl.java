@@ -290,6 +290,7 @@ public class InventoryServiceImpl implements InventoryService {
                 .quantity(inv.getQuantity())
                 .reservedQuantity(inv.getReservedQuantity())
                 .availableQuantity(available)
+                .availableStock(available)
                 .lowStockThreshold(inv.getLowStockThreshold())
                 .isLowStock(isLow)
                 .updatedAt(inv.getUpdatedAt())

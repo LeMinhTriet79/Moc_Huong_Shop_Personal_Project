@@ -34,7 +34,7 @@ public class Review {
     @Column(name = "order_item_id")
     private Long orderItemId;
 
-    @Column(nullable = false, columnDefinition = "tinyint")
+    @Column(nullable = false)
     private Integer rating;
 
     @Column(length = 200)

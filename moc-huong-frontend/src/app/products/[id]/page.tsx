@@ -64,7 +64,7 @@ export default function ProductDetailPage() {
 
         // Fetch reviews
         try {
-          const revs = await catalogService.getReviews(Number(productId));
+          const revs = await catalogService.getReviews(prod.id);
           setReviews(revs.content || []);
         } catch (e) {
           console.warn('Could not fetch reviews:', e);
@@ -110,6 +110,7 @@ export default function ProductDetailPage() {
 
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!product) return;
     if (!isAuthenticated) {
       toast.error('Vui lòng đăng nhập để gửi đánh giá sản phẩm');
       return;
@@ -122,7 +123,7 @@ export default function ProductDetailPage() {
     setIsSubmittingReview(true);
     try {
       const newReview = await catalogService.createReview({
-        productId: Number(productId),
+        productId: product.id,
         rating: ratingInput,
         comment: commentInput.trim(),
       });
@@ -172,7 +173,11 @@ export default function ProductDetailPage() {
 
   const isFav = isInWishlist(product.id);
   const currentPrice = selectedVariant?.price || product.basePrice;
-  const availableStock = inventory?.availableStock ?? (selectedVariant?.availableStock ?? 10);
+  const availableStock =
+    inventory?.availableStock ??
+    (inventory as any)?.availableQuantity ??
+    selectedVariant?.availableStock ??
+    10;
   const images = product.images?.length
     ? product.images
     : [{ id: 1, productId: product.id, imageUrl: selectedImage, displayOrder: 1, isPrimary: true }];

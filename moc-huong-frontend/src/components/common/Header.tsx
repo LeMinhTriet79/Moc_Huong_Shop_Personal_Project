@@ -60,8 +60,8 @@ export default function Header() {
     { label: 'Trang Chủ', href: '/' },
     { label: 'Cửa Hàng', href: '/shop' },
     { label: 'Nhang Trầm & Nụ', href: '/shop?categoryId=1' },
-    { label: 'Tinh Dầu Thiên Nhiên', href: '/shop?categoryId=2' },
-    { label: 'Vòng Gỗ & Chuỗi 108', href: '/shop?categoryId=3' },
+    { label: 'Tinh Dầu Thiên Nhiên', href: '/shop?categoryId=3' },
+    { label: 'Vòng Gỗ & Chuỗi 108', href: '/shop?categoryId=4' },
     { label: 'Về Mộc Hương', href: '/about' },
   ];
 

@@ -194,9 +194,9 @@ public class ProductServiceImpl implements ProductService {
 
                 Inventory inventory = Inventory.builder()
                         .variant(savedVar)
-                        .quantity(request.getStockQuantity() != null ? request.getStockQuantity() : 0)
+                        .quantity(request.getStockQuantity() != null ? request.getStockQuantity() : 50)
                         .reservedQuantity(0)
-                        .lowStockThreshold(10)
+                        .lowStockThreshold(request.getLowStockThreshold() != null ? request.getLowStockThreshold() : 5)
                         .build();
                 inventoryRepository.save(inventory);
                 savedVar.setInventory(inventory);
@@ -450,6 +450,8 @@ public class ProductServiceImpl implements ProductService {
                 .id(p.getId())
                 .name(p.getName())
                 .slug(p.getSlug())
+                .skuPrefix(extractSkuPrefix(variantDtos, p.getId()))
+                .tags(p.getTags())
                 .shortDescription(p.getShortDescription())
                 .description(p.getDescription())
                 .brand(p.getBrand())
@@ -466,6 +468,15 @@ public class ProductServiceImpl implements ProductService {
                 .images(imageDtos)
                 .variants(variantDtos)
                 .build();
+    }
+
+    private String extractSkuPrefix(List<ProductDetailResponse.VariantDto> variantDtos, Long productId) {
+        if (variantDtos != null && !variantDtos.isEmpty() && variantDtos.get(0).getSku() != null) {
+            String firstSku = variantDtos.get(0).getSku();
+            int lastDash = firstSku.lastIndexOf('-');
+            return lastDash > 0 ? firstSku.substring(0, lastDash) : firstSku;
+        }
+        return "MH-SP" + productId;
     }
 
     private ProductDetailResponse mapToDetailResponse(Product product) {
@@ -525,6 +536,7 @@ public class ProductServiceImpl implements ProductService {
                 .id(product.getId())
                 .name(product.getName())
                 .slug(product.getSlug())
+                .skuPrefix(extractSkuPrefix(variantDtos, product.getId()))
                 .shortDescription(product.getShortDescription())
                 .description(product.getDescription())
                 .brand(product.getBrand())

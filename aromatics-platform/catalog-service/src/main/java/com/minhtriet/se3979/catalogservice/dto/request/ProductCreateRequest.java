@@ -1,5 +1,6 @@
 package com.minhtriet.se3979.catalogservice.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.util.List;
@@ -13,11 +14,16 @@ public class ProductCreateRequest {
     private String brand;
     private List<String> tags;
 
-    // BỔ SUNG TRƯỜNG NÀY ĐỂ HỖ TRỢ ĐA BIẾN THỂ (MULTI-VARIANT)
+    // Hỗ trợ đa biến thể (Multi-variant)
     private List<VariantCreateRequest> variants;
 
-    // 3 TRƯỜNG NÀY ĐỂ TẠO VARIANT VÀ TỒN KHO MẶC ĐỊNH (FALLBACK TƯƠNG THÍCH NGƯỢC)
+    // Các trường fallback tạo variant mặc định
+    @JsonAlias({"skuPrefix"})
     private String sku;
+
+    @JsonAlias({"basePrice"})
     private BigDecimal price;
+
     private Integer stockQuantity;
+    private Integer lowStockThreshold;
 }

@@ -45,7 +45,7 @@ public class NotificationLog {
     @Column(name = "content_preview", length = 500)
     private String contentPreview;
 
-    @Column(name = "body_content", columnDefinition = "LONGTEXT")
+    @Column(name = "body_content", columnDefinition = "TEXT")
     private String bodyContent;
 
     @Column(nullable = false, length = 20)

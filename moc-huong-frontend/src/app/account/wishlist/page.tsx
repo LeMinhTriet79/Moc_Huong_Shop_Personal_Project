@@ -15,26 +15,25 @@ export default function WishlistPage() {
   useEffect(() => {
     async function loadFavorites() {
       setIsLoading(true);
-      await fetchWishlist();
       try {
+        await fetchWishlist();
         const res = await api.get('/api/identity/users/me/wishlists');
         const list = res.data?.data || [];
 
-        // For each favorite item, fetch product details or map if product is embedded
-        const prods: ProductResponse[] = [];
-        for (const item of list) {
-          if (item.product) {
-            prods.push(item.product);
-          } else if (item.productId) {
-            try {
-              const pRes = await api.get(`/api/catalog/products/${item.productId}`);
-              if (pRes.data?.data) prods.push(pRes.data.data);
-            } catch (e) {
-              console.warn('Could not load favorite product details:', item.productId);
-            }
+        const productPromises = list.map(async (item: any) => {
+          if (item.product) return item.product as ProductResponse;
+          const pid = typeof item === 'number' ? item : item.productId;
+          if (!pid) return null;
+          try {
+            const pRes = await api.get(`/api/catalog/products/${pid}`);
+            return (pRes.data?.data as ProductResponse) || null;
+          } catch {
+            return null;
           }
-        }
-        setFavoriteProducts(prods);
+        });
+
+        const resolved = await Promise.all(productPromises);
+        setFavoriteProducts(resolved.filter((p): p is ProductResponse => p !== null));
       } catch (err) {
         console.error('Failed to load favorites:', err);
       } finally {

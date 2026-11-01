@@ -9,6 +9,7 @@ import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -99,4 +100,12 @@ public class Order {
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items;
+
+    public void addItem(OrderItem item) {
+        if (this.items == null) {
+            this.items = new ArrayList<>();
+        }
+        item.setOrder(this);
+        this.items.add(item);
+    }
 }

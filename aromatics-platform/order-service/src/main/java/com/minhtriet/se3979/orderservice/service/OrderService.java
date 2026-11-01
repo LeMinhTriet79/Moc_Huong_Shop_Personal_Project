@@ -35,7 +35,7 @@ public interface OrderService {
             Long orderId, String newStatus, String note, String changedByType, Long changedById,
             String trackingNumber, String carrier);
 
-    void updateStaffNotes(Long orderId, String staffNotes);
+    OrderResponse updateStaffNotes(Long orderId, String staffNotes);
 
     void handlePaymentSuccess(
             String orderCode, String transactionCode, String gatewayTxnId,

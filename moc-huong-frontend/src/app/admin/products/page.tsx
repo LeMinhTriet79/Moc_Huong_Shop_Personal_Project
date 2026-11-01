@@ -79,7 +79,7 @@ export default function AdminProductsPage() {
     setEditingProduct(prod);
     setProdName(prod.name);
     setProdSlug(prod.slug);
-    setProdSkuPrefix(prod.skuPrefix);
+    setProdSkuPrefix(prod.skuPrefix || '');
     setProdDescription(prod.description);
     setProdBrand(prod.brand);
     setProdBasePrice(prod.basePrice);
@@ -99,15 +99,23 @@ export default function AdminProductsPage() {
     setIsSaving(true);
     const formData = new FormData();
 
+    const normalizedPrefix = prodSkuPrefix.trim().toUpperCase();
     const productPayload = {
       name: prodName.trim(),
       slug: prodSlug.trim() || prodName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      skuPrefix: prodSkuPrefix.trim(),
+      skuPrefix: normalizedPrefix,
+      sku: `${normalizedPrefix}-STD`,
       description: prodDescription.trim(),
+      shortDescription: prodDescription.trim().slice(0, 180),
       brand: prodBrand.trim(),
-      basePrice: prodBasePrice,
-      categoryId: prodCategoryId,
-      tags: prodTags.split(',').map((t) => t.trim()),
+      basePrice: Number(prodBasePrice),
+      price: Number(prodBasePrice),
+      stockQuantity: 50,
+      categoryId: Number(prodCategoryId),
+      tags: prodTags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean),
       isActive: true,
     };
 
@@ -175,7 +183,7 @@ export default function AdminProductsPage() {
   // Variant Drawer functions
   const openVariantDrawer = async (prod: ProductResponse) => {
     setVariantDrawerProduct(prod);
-    setNewVariantSku(`${prod.skuPrefix}-${Date.now().toString().slice(-4)}`);
+    setNewVariantSku(`${prod.skuPrefix || 'MH'}-${Date.now().toString().slice(-4)}`);
     setNewVariantName('');
     setNewVariantPrice(prod.basePrice);
     try {
@@ -227,7 +235,8 @@ export default function AdminProductsPage() {
 
   const displayedProducts = products.filter((p) =>
     p.name.toLowerCase().includes(keyword.toLowerCase()) ||
-    p.skuPrefix.toLowerCase().includes(keyword.toLowerCase())
+    (p.skuPrefix || '').toLowerCase().includes(keyword.toLowerCase()) ||
+    (p.variants || []).some((v) => (v.sku || '').toLowerCase().includes(keyword.toLowerCase()))
   );
 
   return (

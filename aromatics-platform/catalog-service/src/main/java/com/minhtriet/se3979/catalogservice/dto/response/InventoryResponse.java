@@ -21,7 +21,12 @@ public class InventoryResponse {
     private Integer quantity;
     private Integer reservedQuantity;
     private Integer availableQuantity;
+    private Integer availableStock;
     private Integer lowStockThreshold;
     private Boolean isLowStock;
     private LocalDateTime updatedAt;
+
+    public Integer getAvailableStock() {
+        return availableStock != null ? availableStock : availableQuantity;
+    }
 }

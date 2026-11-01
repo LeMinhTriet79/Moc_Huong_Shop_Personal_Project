@@ -151,11 +151,19 @@ public class ReviewServiceImpl implements ReviewService {
         String prodName = review.getProduct() != null ? review.getProduct().getName() : null;
         boolean verified = review.getOrderItemId() != null;
 
-        String userName = "Khách hàng #" + review.getUserId();
+        String resolvedUserName = switch (review.getUserId() != null ? review.getUserId().intValue() : 0) {
+            case 1 -> "Quản Trị Viên Mộc Hương";
+            case 2 -> "Nghệ Nhân Mộc Hương";
+            case 3 -> "Nguyễn Minh Triết";
+            case 4 -> "Trần Thanh Hà";
+            case 5 -> "Lê Hoàng Nam";
+            case 6 -> "Phạm Anh Thư";
+            default -> "Khách hàng Mộc Hương #" + review.getUserId();
+        };
         var currentUser = SecurityUtils.getCurrentUser();
         if (currentUser.isPresent() && currentUser.get().getUserId().equals(review.getUserId())
                 && currentUser.get().getFullName() != null && !currentUser.get().getFullName().isBlank()) {
-            userName = currentUser.get().getFullName();
+            resolvedUserName = currentUser.get().getFullName();
         }
 
         return ReviewResponse.builder()
@@ -163,7 +171,7 @@ public class ReviewServiceImpl implements ReviewService {
                 .productId(prodId)
                 .productName(prodName)
                 .userId(review.getUserId())
-                .userName(userName)
+                .userName(resolvedUserName)
                 .variantName(variantName)
                 .rating(review.getRating())
                 .title(review.getTitle())

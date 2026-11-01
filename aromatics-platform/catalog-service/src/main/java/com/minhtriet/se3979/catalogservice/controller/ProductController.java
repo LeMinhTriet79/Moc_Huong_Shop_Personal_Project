@@ -40,10 +40,23 @@ public class ProductController {
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size) {
+            @RequestParam(defaultValue = "12") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction) {
+
+        String safeSortField = switch (sortBy) {
+            case "basePrice", "startingPrice", "price" -> "basePrice";
+            case "totalSold" -> "totalSold";
+            case "averageRating" -> "averageRating";
+            case "name" -> "name";
+            default -> "createdAt";
+        };
+        org.springframework.data.domain.Sort sort = "asc".equalsIgnoreCase(direction)
+                ? org.springframework.data.domain.Sort.by(safeSortField).ascending()
+                : org.springframework.data.domain.Sort.by(safeSortField).descending();
 
         Page<ProductResponse> products = productService.searchProducts(
-                keyword, categoryId, brand, minPrice, maxPrice, PageRequest.of(page, size));
+                keyword, categoryId, brand, minPrice, maxPrice, PageRequest.of(page, size, sort));
         return ResponseEntity.ok(ApiResponse.success(products, "Lấy danh sách sản phẩm thành công"));
     }
 

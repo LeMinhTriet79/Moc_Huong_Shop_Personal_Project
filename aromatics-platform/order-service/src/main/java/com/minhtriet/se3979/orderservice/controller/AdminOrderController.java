@@ -95,13 +95,14 @@ public class AdminOrderController {
     }
 
     // 4. Cập nhật ghi chú nội bộ (staffNotes)
-    @PutMapping("/{orderId}/staff-notes")
-    public ResponseEntity<ApiResponse<String>> updateStaffNotes(
+    @PutMapping(value = {"/{orderId}/staff-notes", "/{orderId}/notes"})
+    @PatchMapping(value = {"/{orderId}/staff-notes", "/{orderId}/notes"})
+    public ResponseEntity<ApiResponse<OrderResponse>> updateStaffNotes(
             @PathVariable Long orderId,
             @RequestBody UpdateStaffNotesRequest request) {
 
-        orderService.updateStaffNotes(orderId, request.getStaffNotes());
-        return ResponseEntity.ok(ApiResponse.success("OK", "Cập nhật ghi chú nội bộ thành công"));
+        OrderResponse updated = orderService.updateStaffNotes(orderId, request.getStaffNotes());
+        return ResponseEntity.ok(ApiResponse.success(updated, "Cập nhật ghi chú nội bộ thành công"));
     }
 
     // 5. Xuất báo cáo danh sách đơn hàng ra file Excel (Apache POI)

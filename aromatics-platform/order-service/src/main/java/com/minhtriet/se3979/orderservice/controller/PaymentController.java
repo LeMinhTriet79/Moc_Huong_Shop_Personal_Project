@@ -10,13 +10,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
-import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.Map;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/order/payment")
+@RequestMapping({"/api/order/payment", "/api/order/payments"})
 @RequiredArgsConstructor
 public class PaymentController {
 
@@ -45,26 +43,12 @@ public class PaymentController {
                 Map.of("paymentUrl", paymentUrl), "Tạo link thanh toán VNPay thành công"));
     }
 
-    // 3. API Nhận Kết Quả Trả Về Từ VNPay Callback
+    // 3. API Nhận Kết Quả Trả Về Từ VNPay Callback (Hỗ trợ cả IPN lẫn User Redirect Return)
     @GetMapping("/vnpay-return")
-    public ResponseEntity<ApiResponse<String>> vnpayReturn(HttpServletRequest request) {
-        Map<String, String> requestParams = new HashMap<>();
-        for (Enumeration<String> params = request.getParameterNames(); params.hasMoreElements(); ) {
-            String paramName = params.nextElement();
-            String paramValue = request.getParameter(paramName);
-            if (paramValue != null && !paramValue.isEmpty()) {
-                requestParams.put(paramName, paramValue);
-            }
-        }
-
-        Map<String, Object> result = vnPayService.processReturn(requestParams);
+    public ResponseEntity<ApiResponse<Map<String, Object>>> vnpayReturn(@RequestParam Map<String, String> allParams) {
+        Map<String, Object> result = vnPayService.processReturn(allParams);
         boolean isSuccess = Boolean.TRUE.equals(result.get("success"));
-        String message = (String) result.get("message");
-
-        if (isSuccess) {
-            return ResponseEntity.ok(ApiResponse.success(message, "Thanh toán thành công"));
-        } else {
-            return ResponseEntity.badRequest().body(ApiResponse.error(message));
-        }
+        String message = (String) result.getOrDefault("message", isSuccess ? "Xác thực thanh toán VNPay thành công" : "Giao dịch VNPay không thành công hoặc chữ ký không hợp lệ");
+        return ResponseEntity.ok(ApiResponse.success(result, message));
     }
 }

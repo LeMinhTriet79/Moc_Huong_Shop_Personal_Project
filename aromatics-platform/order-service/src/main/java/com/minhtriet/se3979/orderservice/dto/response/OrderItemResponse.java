@@ -23,9 +23,24 @@ public class OrderItemResponse {
     private BigDecimal unitPrice;
     private Integer quantity;
     private BigDecimal subtotal;
+    private BigDecimal totalPrice;
     private Long reviewId;
 
+    public BigDecimal getTotalPrice() {
+        if (totalPrice != null) {
+            return totalPrice;
+        }
+        if (subtotal != null) {
+            return subtotal;
+        }
+        if (unitPrice != null && quantity != null) {
+            return unitPrice.multiply(BigDecimal.valueOf(quantity));
+        }
+        return BigDecimal.ZERO;
+    }
+
     public static OrderItemResponse fromEntity(OrderItem item) {
+        if (item == null) return null;
         return OrderItemResponse.builder()
                 .id(item.getId())
                 .productId(item.getProductId())
@@ -37,6 +52,7 @@ public class OrderItemResponse {
                 .unitPrice(item.getUnitPrice())
                 .quantity(item.getQuantity())
                 .subtotal(item.getSubtotal())
+                .totalPrice(item.getSubtotal())
                 .reviewId(item.getReviewId())
                 .build();
     }
