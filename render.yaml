@@ -7,7 +7,7 @@ services:
     runtime: docker
     rootDir: aromatics-platform
     dockerfilePath: ./Dockerfile.render-all-in-one
-    plan: starter
+    plan: free
     region: singapore
     envVars:
       - key: PORT
