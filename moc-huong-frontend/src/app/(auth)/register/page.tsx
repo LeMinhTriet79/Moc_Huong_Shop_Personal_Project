@@ -36,11 +36,11 @@ export default function RegisterPage() {
     setIsLoading(true);
     try {
       await identityService.register(email.trim(), password, fullName.trim());
-      toast.success('Đăng ký tài khoản thành công! Vui lòng kiểm tra email kích hoạt.', {
+      toast.success('Đăng ký tài khoản thành công! Mời quý khách đăng nhập.', {
         icon: '🌿',
-        duration: 5000,
+        duration: 4000,
       });
-      router.push('/login');
+      router.push(`/login?email=${encodeURIComponent(email.trim())}`);
     } catch (err: any) {
       console.error('Register error:', err);
       const msg = err.response?.data?.message || 'Không thể tạo tài khoản. Vui lòng thử lại';
